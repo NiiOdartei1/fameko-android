@@ -14,8 +14,9 @@ fun main() {
         println("Starting backend application...")
         DatabaseInitializer.init()
         println("Database initialized successfully.")
-        println("Starting Ktor server on port 8080...")
-        embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
+        val port = System.getenv("PORT")?.toInt() ?: 8080
+        println("Starting Ktor server on port $port...")
+        embeddedServer(Netty, port = port, host = "0.0.0.0", module = Application::module)
             .start(wait = true)
     } catch (e: Exception) {
         println("CRITICAL ERROR during startup: ${e.message}")

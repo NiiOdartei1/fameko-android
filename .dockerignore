@@ -1,0 +1,10 @@
+.gradle
+.idea
+**/build
+app
+app-driver
+app-customer
+core
+.git
+*.iml
+local.properties

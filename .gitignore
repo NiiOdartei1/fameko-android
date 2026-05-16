@@ -1,0 +1,47 @@
+# Built objects
+bin/
+gen/
+obj/
+
+# Gradle
+.gradle/
+build/
+**/build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.settings/
+.classpath
+
+# Local configuration
+local.properties
+.idea/workspace.xml
+.idea/libraries
+.idea/modules.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/caches
+
+# Misc
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+
+# Logs
+*.log
+
+# Backend specific
+backend/bin/
+backend/build/
+backend/out/
+
+# Database
+*.db
+*.db-journal
+*.trace.db
+*.lock.db

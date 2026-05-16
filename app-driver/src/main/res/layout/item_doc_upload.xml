@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8.dp"
+    app:cardCornerRadius="12.dp"
+    app:cardElevation="1dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12.dp"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/ivDocIcon"
+            android:layout_width="40.dp"
+            android:layout_height="40.dp"
+            android:src="@android:drawable/ic_menu_gallery"
+            app:tint="#004E89" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="12.dp">
+
+            <TextView
+                android:id="@+id/tvDocTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Document Title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvDocStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Not uploaded"
+                android:textSize="12sp"
+                android:textColor="#DC3545" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnUpload"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Upload"
+            app:icon="@android:drawable/ic_menu_upload" />
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

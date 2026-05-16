@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fameko Admin - Command Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #004E89;
+            --primary-light: #0077D3;
+            --secondary-color: #28A745;
+            --danger-color: #DC3545;
+            --warning-color: #FFC107;
+            --light-bg: #F0F2F5;
+            --dark-text: #1C1E21;
+            --sidebar-width: 260px;
+            --card-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            line-height: 1.5;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, var(--primary-color) 0%, #00335c 100%);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            padding-top: 0;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            background: rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .sidebar-header i { font-size: 1.5rem; }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0 15px;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-weight: 500;
+            opacity: 0.85;
+        }
+
+        .sidebar-menu li:hover {
+            background-color: rgba(255,255,255,0.15);
+            opacity: 1;
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li i {
+            margin-right: 15px;
+            width: 20px;
+            font-size: 1.1rem;
+        }
+
+        .sidebar-menu li.active {
+            background-color: white;
+            color: var(--primary-color);
+            opacity: 1;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 40px;
+            max-width: 1400px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0;
+            color: #1a1a1a;
+        }
+
+        .search-bar {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            box-shadow: var(--card-shadow);
+            width: 350px;
+        }
+
+        .search-bar input {
+            border: none;
+            outline: none;
+            width: 100%;
+            margin-left: 10px;
+            font-size: 0.9rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            transition: var(--transition);
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+        .stat-info { display: flex; flex-direction: column; }
+
+        .stat-card .label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--dark-text);
+        }
+
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .icon-blue { background: #e7f3ff; color: #007bff; }
+        .icon-green { background: #e8f5e9; color: #2e7d32; }
+        .icon-orange { background: #fff3e0; color: #ef6c00; }
+        .icon-purple { background: #f3e5f5; color: #7b1fa2; }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            padding: 0;
+            margin-bottom: 40px;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+
+        .card-header {
+            padding: 25px 30px;
+            border-bottom: 1px solid #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .table-container { padding: 0 10px 10px; }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        th {
+            text-align: left;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            font-weight: 700;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.8px;
+        }
+
+        td {
+            padding: 18px 20px;
+            border-bottom: 1px solid #f1f3f5;
+            vertical-align: middle;
+        }
+
+        tr:hover td { background-color: #fafbfc; }
+
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .status-PENDING { background: #fff9db; color: #f08c00; }
+        .status-APPROVED { background: #ebfbee; color: #2b8a3e; }
+        .status-REJECTED { background: #fff5f5; color: #c92a2a; }
+        .status-IN_TRANSIT { background: #e7f5ff; color: #1971c2; }
+
+        .btn-group { display: flex; gap: 8px; }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 700;
+            transition: var(--transition);
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-approve { background-color: var(--secondary-color); color: white; }
+        .btn-reject { background-color: #f1f3f5; color: var(--danger-color); }
+        .btn:hover { transform: translateY(-2px); filter: brightness(105%); }
+        .btn-approve:hover { box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3); }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: white;
+            padding: 8px 20px 8px 8px;
+            border-radius: 40px;
+            box-shadow: var(--card-shadow);
+        }
+
+        .user-avatar {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .user-name { font-weight: 600; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-shield-alt"></i>
+            <h2 style="margin:0; font-size: 1.4rem; letter-spacing: 1px;">FAMEKO</h2>
+        </div>
+        <ul class="sidebar-menu">
+            <li th:class="${activePage == 'dashboard' ? 'active' : ''}" onclick="window.location='/admin/dashboard'"><i class="fas fa-th-large"></i> Dashboard</li>
+            <li th:class="${activePage == 'drivers' ? 'active' : ''}" onclick="window.location='/admin/drivers'"><i class="fas fa-id-card"></i> Drivers</li>
+            <li th:class="${activePage == 'customers' ? 'active' : ''}" onclick="window.location='/admin/customers'"><i class="fas fa-user-group"></i> Customers</li>
+            <li th:class="${activePage == 'deliveries' ? 'active' : ''}" onclick="window.location='/admin/deliveries'"><i class="fas fa-route"></i> Deliveries</li>
+            <li><i class="fas fa-chart-pie"></i> Analytics</li>
+            <li th:class="${activePage == 'settings' ? 'active' : ''}" onclick="window.location='/admin/settings'"><i class="fas fa-gear"></i> Settings</li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Command Center</h1>
+
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div class="search-bar">
+                    <i class="fas fa-search" style="color: #adb5bd"></i>
+                    <input type="text" placeholder="Search drivers, orders, or customers...">
+                </div>
+
+                <div class="user-profile">
+                    <div class="user-avatar">A</div>
+                    <span class="user-name">Administrator</span>
+                    <i class="fas fa-chevron-down" style="font-size: 0.7rem; color: #adb5bd"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="label">Total Drivers</span>
+                    <span class="value" th:text="${#lists.size(drivers)}">0</span>
+                </div>
+                <div class="stat-icon icon-blue">
+                    <i class="fas fa-users"></i>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="label">Live Deliveries</span>
+                    <span class="value" th:text="${#lists.size(deliveries)}">0</span>
+                </div>
+                <div class="stat-icon icon-purple">
+                    <i class="fas fa-truck-fast"></i>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="label">Pending Approvals</span>
+                    <span class="value" th:text="${pendingCount}">0</span>
+                </div>
+                <div class="stat-icon icon-orange">
+                    <i class="fas fa-clock"></i>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-info">
+                    <span class="label">Success Rate</span>
+                    <span class="value">98.4%</span>
+                </div>
+                <div class="stat-icon icon-green">
+                    <i class="fas fa-circle-check"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-user-clock" style="color: var(--warning-color)"></i>
+                    Driver Registrations
+                </div>
+                <button class="btn" style="background: transparent; color: var(--primary-color)">View All</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Driver Information</th>
+                            <th>Vehicle Type</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="driver : ${drivers}">
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 12px">
+                                    <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.7rem; background: #f0f2f5; color: #666" th:text="${#strings.substring(driver.name, 0, 1)}">J</div>
+                                    <div>
+                                        <div style="font-weight:700; font-size: 0.9rem" th:text="${driver.name}">John Doe</div>
+                                        <div style="font-size:0.75rem; color:#6c757d" th:text="${driver.email}">john@example.com</div>
+                                        <div style="font-size:0.75rem; color:#adb5bd" th:text="${driver.phone != null && driver.phone != '' ? driver.phone : 'No Phone'}">024 123 4567</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.9rem">
+                                    <i th:class="${driver.vehicle == 'Car' ? 'fas fa-car' : (driver.vehicle == 'Motorcycle' ? 'fas fa-motorcycle' : 'fas fa-truck')}" style="color: #6c757d"></i>
+                                    <span th:text="${driver.vehicle}">Car</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span th:class="${'status-badge status-' + driver.status}" th:text="${driver.status}">PENDING</span>
+                            </td>
+                            <td>
+                                <div th:if="${driver.status == 'PENDING'}" class="btn-group">
+                                    <form th:action="'/admin/approve/' + ${driver.id}" method="post">
+                                        <button type="submit" class="btn btn-approve">
+                                            <i class="fas fa-check"></i> Approve
+                                        </button>
+                                    </form>
+                                    <form th:action="'/admin/reject/' + ${driver.id}" method="post">
+                                        <button type="submit" class="btn btn-reject">
+                                            <i class="fas fa-xmark"></i> Reject
+                                        </button>
+                                    </form>
+                                </div>
+                                <div th:unless="${driver.status == 'PENDING'}">
+                                    <button class="btn" style="background: #f8f9fa; color: #adb5bd; cursor: default">
+                                        <i class="fas fa-lock"></i> Processed
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="fas fa-tower-broadcast" style="color: var(--danger-color)"></i>
+                    Live Delivery Monitor
+                </div>
+                <div style="display: flex; gap: 10px">
+                    <span class="status-badge status-APPROVED" style="font-size: 0.65rem">System Online</span>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Route Details</th>
+                            <th>Progress</th>
+                            <th>Assigned Driver</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="delivery : ${deliveries}">
+                            <td style="font-weight: 700; color: var(--primary-color)" th:text="'#' + ${delivery.id}">#101</td>
+                            <td>
+                                <div style="display: flex; flex-direction: column; gap: 4px">
+                                    <div style="font-weight:700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px">
+                                        <i class="fas fa-location-dot" style="color: var(--secondary-color); font-size: 0.7rem"></i>
+                                        <span th:text="${delivery.pickup}">Pickup</span>
+                                    </div>
+                                    <div style="font-weight:700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px">
+                                        <i class="fas fa-location-arrow" style="color: var(--danger-color); font-size: 0.7rem"></i>
+                                        <span th:text="${delivery.dropoff}">Destination</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="status-badge status-IN_TRANSIT" th:text="${delivery.status}">IN_TRANSIT</span>
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 10px">
+                                    <i class="fas fa-user-circle" style="color: #dee2e6; font-size: 1.2rem"></i>
+                                    <span style="font-weight: 600; font-size: 0.85rem" th:text="${delivery.driver_name != null ? delivery.driver_name : 'Searching...'}">Unassigned</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Fameko Admin - Deliveries</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+    <style>
+        :root {
+            --primary-color: #004E89;
+            --primary-light: #0077D3;
+            --secondary-color: #28A745;
+            --danger-color: #DC3545;
+            --warning-color: #FFC107;
+            --light-bg: #F0F2F5;
+            --dark-text: #1C1E21;
+            --sidebar-width: 260px;
+            --card-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            line-height: 1.5;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, var(--primary-color) 0%, #00335c 100%);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            background: rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0 15px;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-weight: 500;
+            opacity: 0.85;
+        }
+
+        .sidebar-menu li:hover {
+            background-color: rgba(255,255,255,0.15);
+            opacity: 1;
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li i { margin-right: 15px; width: 20px; }
+
+        .sidebar-menu li.active {
+            background-color: white;
+            color: var(--primary-color);
+            opacity: 1;
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 40px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 25px 30px;
+            border-bottom: 1px solid #f0f2f5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        table { width: 100%; border-collapse: separate; border-spacing: 0; }
+        th { text-align: left; padding: 15px 20px; background: #f8f9fa; font-size: 0.75rem; text-transform: uppercase; color: #495057; }
+        td { padding: 18px 20px; border-bottom: 1px solid #f1f3f5; }
+
+        .status-badge { padding: 6px 14px; border-radius: 30px; font-size: 0.75rem; font-weight: 700; }
+        .status-PENDING { background: #fff9db; color: #f08c00; }
+        .status-IN_TRANSIT { background: #e7f5ff; color: #1971c2; }
+        .status-COMPLETED { background: #ebfbee; color: #2b8a3e; }
+
+        .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-shield-alt"></i>
+            <h2 style="margin:0">FAMEKO</h2>
+        </div>
+        <ul class="sidebar-menu">
+            <li th:class="${activePage == 'dashboard' ? 'active' : ''}" onclick="window.location='/admin/dashboard'"><i class="fas fa-th-large"></i> Dashboard</li>
+            <li th:class="${activePage == 'drivers' ? 'active' : ''}" onclick="window.location='/admin/drivers'"><i class="fas fa-id-card"></i> Drivers</li>
+            <li th:class="${activePage == 'customers' ? 'active' : ''}" onclick="window.location='/admin/customers'"><i class="fas fa-user-group"></i> Customers</li>
+            <li th:class="${activePage == 'deliveries' ? 'active' : ''}" onclick="window.location='/admin/deliveries'"><i class="fas fa-route"></i> Deliveries</li>
+            <li><i class="fas fa-chart-pie"></i> Analytics</li>
+            <li th:class="${activePage == 'settings' ? 'active' : ''}" onclick="window.location='/admin/settings'"><i class="fas fa-gear"></i> Settings</li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <h1>Delivery Logs</h1>
+
+        <div class="card">
+            <div class="card-header">
+                <div style="font-weight: 700">Recent Delivery Activities</div>
+                <div style="display:flex; gap:10px">
+                    <input type="text" placeholder="Filter by ID or Driver..." style="padding: 8px 15px; border-radius: 20px; border: 1px solid #ddd; outline: none;"/>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Route</th>
+                        <th>Status</th>
+                        <th>Driver</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="delivery : ${deliveries}">
+                        <td style="font-weight: 700; color: var(--primary-color)" th:text="${'#' + delivery.id}">#101</td>
+                        <td>
+                            <div style="font-weight:700; font-size: 0.85rem" th:text="${delivery.pickup}">Pickup</div>
+                            <div style="font-size:0.75rem; color:#6c757d" th:text="${'→ ' + delivery.dropoff}">Destination</div>
+                        </td>
+                        <td>
+                            <span th:class="${'status-badge status-' + delivery.status}" th:text="${delivery.status}">IN_TRANSIT</span>
+                        </td>
+                        <td>
+                            <div style="font-weight: 600; font-size: 0.85rem" th:text="${delivery.driver_name != null ? delivery.driver_name : 'Unassigned'}">Driver Name</div>
+                        </td>
+                        <td>
+                            <button class="btn" style="background: #f8f9fa; color: var(--primary-color)">Details</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

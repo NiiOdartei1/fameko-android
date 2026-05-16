@@ -15,7 +15,8 @@ COPY shared-models shared-models
 COPY backend backend
 
 # Build the backend application
-RUN ./gradlew :backend:installDist --no-daemon
+# Use lower memory settings for Gradle inside Docker
+RUN ./gradlew :backend:installDist --no-daemon -Dorg.gradle.jvmargs="-Xmx384m"
 
 # Stage 2: Runtime stage
 FROM eclipse-temurin:17-jre-jammy
@@ -26,7 +27,9 @@ COPY --from=build /app/backend/build/install/backend /app/backend
 
 # Use the PORT environment variable provided by Render
 ENV PORT=8080
+# Set Java memory limits for the running app as well
+ENV JAVA_OPTS="-Xmx256m"
 EXPOSE $PORT
 
 # Start the application
-CMD ["/app/backend/bin/backend"]
+CMD ["sh", "-c", "/app/backend/bin/backend"]

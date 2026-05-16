@@ -14,6 +14,10 @@ COPY gradle.properties .
 COPY shared-models shared-models
 COPY backend backend
 
+# Create dummy directories for other modules to satisfy Gradle configuration
+# without copying their entire contents (to save memory/time)
+RUN mkdir -p app app-driver app-customer core
+
 # Build the backend application
 # Use lower memory settings for Gradle inside Docker
 RUN ./gradlew :backend:installDist --no-daemon -Dorg.gradle.jvmargs="-Xmx384m"

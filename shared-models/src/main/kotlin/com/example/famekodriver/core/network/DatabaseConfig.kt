@@ -5,16 +5,13 @@ package com.example.famekodriver.core.network
  * Toggle between local and production by modifying these values.
  */
 object DatabaseConfig {
-    // Set this to true to use a local file (standalone mode like Python/SQLite)
-    // Set to false for remote PostgreSQL (Railway)
-    const val USE_STANDALONE_DB = true
+    // Environment variables with fallbacks
+    val USE_STANDALONE_DB = System.getenv("USE_STANDALONE_DB")?.toBoolean() ?: true
 
-    // Railway Production configuration (for reference)
-    const val DB_HOST = "switchyard.proxy.rlwy.net"
-    const val DB_PORT = 26106
-    const val DB_NAME = "railway"
-    const val DB_USER = "postgres"
-    const val DB_PASS = "FQyDXSzYQfzSBTgnqxgOzWaSrQSAhLXa"
+    // Remote Database configuration
+    val DB_URL = System.getenv("DB_URL") ?: "jdbc:postgresql://switchyard.proxy.rlwy.net:26106/railway?ssl=true&sslmode=require"
+    val DB_USER = System.getenv("DB_USER") ?: "postgres"
+    val DB_PASS = System.getenv("DB_PASS") ?: "FQyDXSzYQfzSBTgnqxgOzWaSrQSAhLXa"
 
     fun getJdbcUrl(): String {
         return if (USE_STANDALONE_DB) {
@@ -22,15 +19,12 @@ object DatabaseConfig {
             val isAndroid = try { System.getProperty("java.vendor")?.contains("Android") == true } catch (e: Exception) { false }
             
             if (isAndroid) {
-                // Android should NOT try to connect to a local H2 file via JDBC
-                // It must use the API. We return an empty string to trigger an error if JDBC is attempted.
                 "" 
             } else {
-                // This creates 'fameko.mv.db' in your PC's project folder
                 "jdbc:h2:./fameko;MODE=PostgreSQL;AUTO_SERVER=TRUE"
             }
         } else {
-            "jdbc:postgresql://$DB_HOST:$DB_PORT/$DB_NAME?ssl=true&sslmode=require"
+            DB_URL
         }
     }
 

@@ -14,9 +14,10 @@ COPY gradle.properties .
 COPY shared-models shared-models
 COPY backend backend
 
-# Create dummy directories for other modules to satisfy Gradle configuration
+# Create dummy directories and files for other modules to satisfy Gradle configuration
 # without copying their entire contents (to save memory/time)
-RUN mkdir -p app app-driver app-customer core
+RUN mkdir -p app app-driver app-customer core && \
+    touch app/build.gradle.kts app-driver/build.gradle.kts app-customer/build.gradle.kts core/build.gradle.kts
 
 # Build the backend application
 # Use lower memory settings for Gradle inside Docker

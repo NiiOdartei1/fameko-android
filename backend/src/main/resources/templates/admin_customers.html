@@ -151,15 +151,15 @@
                 <tbody>
                     <tr th:each="customer : ${customers}">
                         <td>
-                            <div style="font-weight:700" th:text="${customer.name}">Customer Name</div>
-                            <div style="font-size:0.75rem; color:#6c757d" th:text="${customer.email}">customer@example.com</div>
+                            <div style="font-weight:700" th:text="${customer['name']}">Customer Name</div>
+                            <div style="font-size:0.75rem; color:#6c757d" th:text="${customer['email']}">customer@example.com</div>
                         </td>
-                        <td th:text="${customer.phone}">024 123 4567</td>
+                        <td th:text="${customer['phone']}">024 123 4567</td>
                         <td>
-                            <span th:class="${customer.is_active ? 'status-badge status-active' : 'status-badge status-inactive'}"
-                                  th:text="${customer.is_active ? 'Active' : 'Inactive'}">Active</span>
+                            <span th:class="${customer['is_active'] ? 'status-badge status-active' : 'status-badge status-inactive'}"
+                                  th:text="${customer['is_active'] ? 'Active' : 'Inactive'}">Active</span>
                         </td>
-                        <td th:text="${#strings.substring(customer.date_joined, 0, 10)}">2024-01-01</td>
+                        <td th:text="${customer['date_joined'] != null ? #strings.substring(customer['date_joined'], 0, 10) : 'N/A'}">2024-01-01</td>
                         <td>
                             <button class="btn" style="background: #f8f9fa; color: var(--primary-color)">View History</button>
                         </td>

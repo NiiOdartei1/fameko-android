@@ -153,23 +153,23 @@
                 <tbody>
                     <tr th:each="driver : ${drivers}">
                         <td>
-                            <div style="font-weight:700" th:text="${driver.name}">John Doe</div>
-                            <div style="font-size:0.75rem; color:#6c757d" th:text="${driver.email}">john@example.com</div>
+                            <div style="font-weight:700" th:text="${driver['name']}">John Doe</div>
+                            <div style="font-size:0.75rem; color:#6c757d" th:text="${driver['email']}">john@example.com</div>
                         </td>
-                        <td th:text="${driver.vehicle}">Car</td>
+                        <td th:text="${driver['vehicle']}">Car</td>
                         <td>
-                            <span th:class="${'status-badge status-' + driver.status}" th:text="${driver.status}">PENDING</span>
+                            <span th:class="${'status-badge status-' + driver['status']}" th:text="${driver['status']}">PENDING</span>
                         </td>
                         <td>
-                            <div th:if="${driver.status == 'PENDING'}" style="display:flex; gap:8px">
-                                <form th:action="@{'/admin/approve/' + ${driver.id}}" method="post">
+                            <div th:if="${driver['status'] == 'PENDING'}" style="display:flex; gap:8px">
+                                <form th:action="@{'/admin/approve/' + ${driver['id']}}" method="post">
                                     <button type="submit" class="btn btn-approve">Approve</button>
                                 </form>
-                                <form th:action="@{'/admin/reject/' + ${driver.id}}" method="post">
+                                <form th:action="@{'/admin/reject/' + ${driver['id']}}" method="post">
                                     <button type="submit" class="btn btn-reject">Reject</button>
                                 </form>
                             </div>
-                            <button th:unless="${driver.status == 'PENDING'}" class="btn" style="background: #f8f9fa; color: var(--primary-color)">View Profile</button>
+                            <button th:unless="${driver['status'] == 'PENDING'}" class="btn" style="background: #f8f9fa; color: var(--primary-color)">View Profile</button>
                         </td>
                     </tr>
                 </tbody>

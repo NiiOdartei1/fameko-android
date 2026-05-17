@@ -392,37 +392,37 @@
                         <tr th:each="driver : ${drivers}">
                             <td>
                                 <div style="display: flex; align-items: center; gap: 12px">
-                                    <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.7rem; background: #f0f2f5; color: #666" th:text="${#strings.substring(driver.name, 0, 1)}">J</div>
+                                    <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.7rem; background: #f0f2f5; color: #666" th:text="${driver['name'] != null ? #strings.substring(driver['name'], 0, 1) : 'D'}">J</div>
                                     <div>
-                                        <div style="font-weight:700; font-size: 0.9rem" th:text="${driver.name}">John Doe</div>
-                                        <div style="font-size:0.75rem; color:#6c757d" th:text="${driver.email}">john@example.com</div>
-                                        <div style="font-size:0.75rem; color:#adb5bd" th:text="${driver.phone != null && driver.phone != '' ? driver.phone : 'No Phone'}">024 123 4567</div>
+                                        <div style="font-weight:700; font-size: 0.9rem" th:text="${driver['name']}">John Doe</div>
+                                        <div style="font-size:0.75rem; color:#6c757d" th:text="${driver['email']}">john@example.com</div>
+                                        <div style="font-size:0.75rem; color:#adb5bd" th:text="${driver['phone'] != null && driver['phone'] != '' ? driver['phone'] : 'No Phone'}">024 123 4567</div>
                                     </div>
                                 </div>
                             </td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.9rem">
-                                    <i th:class="${driver.vehicle == 'Car' ? 'fas fa-car' : (driver.vehicle == 'Motorcycle' ? 'fas fa-motorcycle' : 'fas fa-truck')}" style="color: #6c757d"></i>
-                                    <span th:text="${driver.vehicle}">Car</span>
+                                    <i th:class="${driver['vehicle'] == 'Car' ? 'fas fa-car' : (driver['vehicle'] == 'Motorcycle' ? 'fas fa-motorcycle' : 'fas fa-truck')}" style="color: #6c757d"></i>
+                                    <span th:text="${driver['vehicle']}">Car</span>
                                 </div>
                             </td>
                             <td>
-                                <span th:class="${'status-badge status-' + driver.status}" th:text="${driver.status}">PENDING</span>
+                                <span th:class="${'status-badge status-' + driver['status']}" th:text="${driver['status']}">PENDING</span>
                             </td>
                             <td>
-                                <div th:if="${driver.status == 'PENDING'}" class="btn-group">
-                                    <form th:action="'/admin/approve/' + ${driver.id}" method="post">
+                                <div th:if="${driver['status'] == 'PENDING'}" class="btn-group">
+                                    <form th:action="'/admin/approve/' + ${driver['id']}" method="post">
                                         <button type="submit" class="btn btn-approve">
                                             <i class="fas fa-check"></i> Approve
                                         </button>
                                     </form>
-                                    <form th:action="'/admin/reject/' + ${driver.id}" method="post">
+                                    <form th:action="'/admin/reject/' + ${driver['id']}" method="post">
                                         <button type="submit" class="btn btn-reject">
                                             <i class="fas fa-xmark"></i> Reject
                                         </button>
                                     </form>
                                 </div>
-                                <div th:unless="${driver.status == 'PENDING'}">
+                                <div th:unless="${driver['status'] == 'PENDING'}">
                                     <button class="btn" style="background: #f8f9fa; color: #adb5bd; cursor: default">
                                         <i class="fas fa-lock"></i> Processed
                                     </button>
@@ -456,26 +456,26 @@
                     </thead>
                     <tbody>
                         <tr th:each="delivery : ${deliveries}">
-                            <td style="font-weight: 700; color: var(--primary-color)" th:text="'#' + ${delivery.id}">#101</td>
+                            <td style="font-weight: 700; color: var(--primary-color)" th:text="'#' + ${delivery['id']}">#101</td>
                             <td>
                                 <div style="display: flex; flex-direction: column; gap: 4px">
                                     <div style="font-weight:700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px">
                                         <i class="fas fa-location-dot" style="color: var(--secondary-color); font-size: 0.7rem"></i>
-                                        <span th:text="${delivery.pickup}">Pickup</span>
+                                        <span th:text="${delivery['pickup']}">Pickup</span>
                                     </div>
                                     <div style="font-weight:700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px">
                                         <i class="fas fa-location-arrow" style="color: var(--danger-color); font-size: 0.7rem"></i>
-                                        <span th:text="${delivery.dropoff}">Destination</span>
+                                        <span th:text="${delivery['dropoff']}">Destination</span>
                                     </div>
                                 </div>
                             </td>
                             <td>
-                                <span class="status-badge status-IN_TRANSIT" th:text="${delivery.status}">IN_TRANSIT</span>
+                                <span class="status-badge status-IN_TRANSIT" th:text="${delivery['status']}">IN_TRANSIT</span>
                             </td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 10px">
                                     <i class="fas fa-user-circle" style="color: #dee2e6; font-size: 1.2rem"></i>
-                                    <span style="font-weight: 600; font-size: 0.85rem" th:text="${delivery.driver_name != null ? delivery.driver_name : 'Searching...'}">Unassigned</span>
+                                    <span style="font-weight: 600; font-size: 0.85rem" th:text="${delivery['driver_name'] != null ? delivery['driver_name'] : 'Searching...'}">Unassigned</span>
                                 </div>
                             </td>
                         </tr>

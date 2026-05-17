@@ -151,16 +151,16 @@
                 </thead>
                 <tbody>
                     <tr th:each="delivery : ${deliveries}">
-                        <td style="font-weight: 700; color: var(--primary-color)" th:text="${'#' + delivery.id}">#101</td>
+                        <td style="font-weight: 700; color: var(--primary-color)" th:text="${'#' + delivery['id']}">#101</td>
                         <td>
-                            <div style="font-weight:700; font-size: 0.85rem" th:text="${delivery.pickup}">Pickup</div>
-                            <div style="font-size:0.75rem; color:#6c757d" th:text="${'→ ' + delivery.dropoff}">Destination</div>
+                            <div style="font-weight:700; font-size: 0.85rem" th:text="${delivery['pickup']}">Pickup</div>
+                            <div style="font-size:0.75rem; color:#6c757d" th:text="${'→ ' + delivery['dropoff']}">Destination</div>
                         </td>
                         <td>
-                            <span th:class="${'status-badge status-' + delivery.status}" th:text="${delivery.status}">IN_TRANSIT</span>
+                            <span th:class="${'status-badge status-' + delivery['status']}" th:text="${delivery['status']}">IN_TRANSIT</span>
                         </td>
                         <td>
-                            <div style="font-weight: 600; font-size: 0.85rem" th:text="${delivery.driver_name != null ? delivery.driver_name : 'Unassigned'}">Driver Name</div>
+                            <div style="font-weight: 600; font-size: 0.85rem" th:text="${delivery['driver_name'] != null ? delivery['driver_name'] : 'Unassigned'}">Driver Name</div>
                         </td>
                         <td>
                             <button class="btn" style="background: #f8f9fa; color: var(--primary-color)">Details</button>

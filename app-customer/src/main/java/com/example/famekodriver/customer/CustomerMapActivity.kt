@@ -46,6 +46,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.famekodriver.core.data.SessionManager
 import com.example.famekodriver.core.data.repository.DriverRepository
 import com.example.famekodriver.core.domain.model.DriverLocation
 import com.example.famekodriver.core.domain.model.RouteLocation
@@ -88,6 +89,7 @@ private fun carIconDrawable(context: Context, rawResId: Int, width: Int, height:
 @Composable
 fun CustomerMapScreen() {
     val context = LocalContext.current
+    val sessionManager = remember { SessionManager(context) }
     val scope = rememberCoroutineScope()
     val repository = remember { DriverRepository() }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -277,19 +279,27 @@ fun CustomerMapScreen() {
                     line.setPoints(polylineGeoPoints)
                     line.outlinePaint.color = android.graphics.Color.parseColor("#004E89")
                     line.outlinePaint.strokeWidth = 12f
+                    line.outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                    line.outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
                     mv.overlays.add(line)
                     
-                    val startMarker = Marker(mv)
-                    startMarker.position = pickupGeoPoint
-                    startMarker.title = "Pickup"
-                    startMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                    mv.overlays.add(startMarker)
+                    if (pickupGeoPoint != null) {
+                        val startMarker = Marker(mv)
+                        startMarker.position = pickupGeoPoint
+                        startMarker.title = "Pickup"
+                        startMarker.icon = ContextCompat.getDrawable(context, org.osmdroid.library.R.drawable.marker_default)
+                        startMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        mv.overlays.add(startMarker)
+                    }
                     
-                    val endMarker = Marker(mv)
-                    endMarker.position = dropoffGeoPoint
-                    endMarker.title = "Destination"
-                    endMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                    mv.overlays.add(endMarker)
+                    if (dropoffGeoPoint != null) {
+                        val endMarker = Marker(mv)
+                        endMarker.position = dropoffGeoPoint
+                        endMarker.title = "Destination"
+                        endMarker.icon = ContextCompat.getDrawable(context, org.osmdroid.library.R.drawable.marker_default)
+                        endMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        mv.overlays.add(endMarker)
+                    }
                 }
                 drivers.forEach { driver ->
                     val marker = Marker(mv)
@@ -508,8 +518,9 @@ fun CustomerMapScreen() {
                         onClick = { 
                             isOrderPlacing = true
                             scope.launch {
+                                val customerId = sessionManager.getDriverId() ?: "1" // Reusing driverId key for customer id in shared SessionManager
                                 val multiplier = when(selectedVehicleType) { "Comfort" -> 1.3; "Bike" -> 0.7; else -> 1.0 }
-                                repository.createOrder("1", pickupLocation, dropoffLocation, pickupGeoPoint!!.latitude, pickupGeoPoint!!.longitude, dropoffGeoPoint!!.latitude, dropoffGeoPoint!!.longitude, distanceKm, estimatedFare!! * multiplier, durationMin).onSuccess { id ->
+                                repository.createOrder(customerId, pickupLocation, dropoffLocation, pickupGeoPoint!!.latitude, pickupGeoPoint!!.longitude, dropoffGeoPoint!!.latitude, dropoffGeoPoint!!.longitude, distanceKm, estimatedFare!! * multiplier, durationMin).onSuccess { id ->
                                     isOrderPlacing = false
                                     currentOrderId = id.toIntOrNull()
                                 }.onFailure { e ->

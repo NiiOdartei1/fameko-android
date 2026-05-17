@@ -124,6 +124,20 @@ fun Application.configureRouting() {
             }
         }
 
+        post("/driver/login") {
+            try {
+                val request = call.receive<LoginRequest>()
+                val driver = loginDriverInDb(request.email, request.password)
+                if (driver != null) {
+                    call.respond(AuthResponse(true, "Login successful", driver["id"].toString(), driver["name"].toString()))
+                } else {
+                    call.respond(AuthResponse(false, "Invalid email or password", null, null))
+                }
+            } catch (e: Exception) {
+                call.respond(AuthResponse(false, e.message ?: "Unknown error", null, null))
+            }
+        }
+
         get("/customer/geocode") {
             // Native geocoding placeholder
             val query = call.parameters["q"] ?: ""
@@ -260,6 +274,20 @@ private fun loginCustomerInDb(email: String, pass: String): Map<String, Any>? {
         val rs = stmt.executeQuery()
         if (rs.next()) {
             return mapOf("id" to rs.getInt("id"), "name" to rs.getString("name"))
+        }
+    }
+    return null
+}
+
+private fun loginDriverInDb(email: String, pass: String): Map<String, Any>? {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "SELECT id, full_name FROM drivers WHERE email = ? AND password = ?"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setString(1, email)
+        stmt.setString(2, pass)
+        val rs = stmt.executeQuery()
+        if (rs.next()) {
+            return mapOf("id" to rs.getInt("id"), "name" to rs.getString("full_name"))
         }
     }
     return null

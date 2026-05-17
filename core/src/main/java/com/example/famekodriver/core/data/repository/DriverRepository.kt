@@ -31,39 +31,65 @@ class DriverRepository {
      */
     suspend fun login(email: String, pass: String): Result<Driver?> = withContext(Dispatchers.IO) {
         try {
-            ensureDriverLoaded()
-            DriverManager.getConnection(
-                DatabaseConfig.getJdbcUrl(),
-                DatabaseConfig.DB_USER,
-                DatabaseConfig.DB_PASS,
-            ).use { connection ->
-                val query = "SELECT * FROM drivers WHERE email = ? AND password = ?"
-                connection.prepareStatement(query).use { stmt ->
-                    stmt.setString(1, email)
-                    stmt.setString(2, pass)
-                    val rs = stmt.executeQuery()
-                    if (rs.next()) {
-                        Result.success(Driver(
-                            id = rs.getInt("id"),
-                            fullName = rs.getString("full_name"),
-                            email = rs.getString("email"),
-                            phone = rs.getString("phone") ?: "",
-                            region = rs.getString("region") ?: "",
-                            licenseNumber = rs.getString("license_number") ?: "",
-                            vehicleType = rs.getString("vehicle_type"),
-                            vehicleNumber = rs.getString("vehicle_number") ?: "",
-                            status = rs.getString("status"),
-                            isOnline = false, // From stats table in real app
-                            rating = 5.0
-                        ))
-                    } else {
-                        Result.success(null)
-                    }
-                }
+            val response = NetworkClient.famekoApi.loginDriver(LoginRequest(email, pass))
+            if (response.success && response.userId != null) {
+                // In a real app, we'd fetch the full driver object here
+                // For now, construct a minimal one from the auth response
+                Result.success(Driver(
+                    id = response.userId.toInt(),
+                    fullName = response.userName ?: "Driver",
+                    email = email,
+                    phone = "",
+                    region = "",
+                    licenseNumber = "",
+                    vehicleType = "Car",
+                    vehicleNumber = "",
+                    status = "APPROVED", // Default to approved for test login
+                    isOnline = false,
+                    rating = 5.0
+                ))
+            } else {
+                Result.success(null)
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Login failed", e)
-            Result.failure(e)
+            android.util.Log.e("FamekoRepo", "API Login failed, falling back to JDBC", e)
+            try {
+                ensureDriverLoaded()
+                val url = DatabaseConfig.getJdbcUrl()
+                if (url.isEmpty()) return@withContext Result.failure(e)
+                
+                DriverManager.getConnection(
+                    url,
+                    DatabaseConfig.DB_USER,
+                    DatabaseConfig.DB_PASS,
+                ).use { connection ->
+                    val query = "SELECT * FROM drivers WHERE email = ? AND password = ?"
+                    connection.prepareStatement(query).use { stmt ->
+                        stmt.setString(1, email)
+                        stmt.setString(2, pass)
+                        val rs = stmt.executeQuery()
+                        if (rs.next()) {
+                            Result.success(Driver(
+                                id = rs.getInt("id"),
+                                fullName = rs.getString("full_name"),
+                                email = rs.getString("email"),
+                                phone = rs.getString("phone") ?: "",
+                                region = rs.getString("region") ?: "",
+                                licenseNumber = rs.getString("license_number") ?: "",
+                                vehicleType = rs.getString("vehicle_type"),
+                                vehicleNumber = rs.getString("vehicle_number") ?: "",
+                                status = rs.getString("status"),
+                                isOnline = false,
+                                rating = 5.0
+                            ))
+                        } else {
+                            Result.success(null)
+                        }
+                    }
+                }
+            } catch (e2: Exception) {
+                Result.failure(e2)
+            }
         }
     }
 

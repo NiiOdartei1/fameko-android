@@ -31,6 +31,11 @@ interface FamekoApiService {
         @Body request: LoginRequest
     ): AuthResponse
 
+    @POST("driver/login")
+    suspend fun loginDriver(
+        @Body request: LoginRequest
+    ): AuthResponse
+
     @POST("driver/register")
     suspend fun registerDriver(
         @Part("full_name") name: RequestBody,

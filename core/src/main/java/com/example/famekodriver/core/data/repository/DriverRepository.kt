@@ -45,7 +45,7 @@ class DriverRepository {
                     licenseNumber = "",
                     vehicleType = "Car",
                     vehicleNumber = "",
-                    status = "APPROVED", // Default to approved for test login
+                    status = response.status ?: "PENDING",
                     isOnline = false,
                     rating = 5.0
                 ))

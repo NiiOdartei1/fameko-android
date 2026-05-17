@@ -129,7 +129,7 @@ fun Application.configureRouting() {
                 val request = call.receive<LoginRequest>()
                 val driver = loginDriverInDb(request.email, request.password)
                 if (driver != null) {
-                    call.respond(AuthResponse(true, "Login successful", driver["id"].toString(), driver["name"].toString()))
+                    call.respond(AuthResponse(true, "Login successful", driver["id"].toString(), driver["name"].toString(), driver["status"].toString()))
                 } else {
                     call.respond(AuthResponse(false, "Invalid email or password", null, null))
                 }
@@ -282,13 +282,17 @@ private fun loginCustomerInDb(email: String, pass: String): Map<String, Any>? {
 
 private fun loginDriverInDb(email: String, pass: String): Map<String, Any>? {
     DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = "SELECT id, full_name FROM drivers WHERE email = ? AND password = ?"
+        val sql = "SELECT id, full_name, status FROM drivers WHERE email = ? AND password = ?"
         val stmt = conn.prepareStatement(sql)
         stmt.setString(1, email)
         stmt.setString(2, pass)
         val rs = stmt.executeQuery()
         if (rs.next()) {
-            return mapOf("id" to rs.getInt("id"), "name" to rs.getString("full_name"))
+            return mapOf(
+                "id" to rs.getInt("id"), 
+                "name" to rs.getString("full_name"),
+                "status" to rs.getString("status")
+            )
         }
     }
     return null

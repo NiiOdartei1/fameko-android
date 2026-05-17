@@ -36,6 +36,12 @@
             android:exported="false"
             android:theme="@style/Theme.FamekoDriver" />
 
+        <activity
+            android:name=".DriverProfileActivity"
+            android:exported="false"
+            android:label="My Profile"
+            android:theme="@style/Theme.FamekoDriver" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.example.famekodriver.fileprovider"

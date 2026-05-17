@@ -1,5 +1,6 @@
 package com.example.famekodriver
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,6 +30,17 @@ class MainActivity : ComponentActivity() {
                     Text(text = "Welcome, ${sessionManager.getDriverName()}", fontSize = 18.sp)
                     Spacer(modifier = Modifier.height(32.dp))
                     Text(text = "Status: ${sessionManager.getDriverStatus()}", color = MaterialTheme.colorScheme.primary)
+                    
+                    if (sessionManager.getDriverStatus() != "APPROVED") {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = {
+                            val intent = Intent(this@MainActivity, DriverProfileActivity::class.java)
+                            startActivity(intent)
+                        }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                            Text("Upload Documents")
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(64.dp))
                     Text(text = "Please run the 'app-driver' module for the full Map experience.", color = MaterialTheme.colorScheme.secondary)
                     Spacer(modifier = Modifier.height(16.dp))

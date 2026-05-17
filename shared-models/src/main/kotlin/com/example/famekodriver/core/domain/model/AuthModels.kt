@@ -17,5 +17,6 @@ data class AuthResponse(
     val success: Boolean,
     val message: String?,
     val user_id: String?,
-    val name: String?
+    val name: String?,
+    val status: String? = null
 )

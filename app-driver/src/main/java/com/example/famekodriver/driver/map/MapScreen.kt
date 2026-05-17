@@ -499,25 +499,36 @@ fun MapScreen(
 
 @Composable
 fun RegistrationNotice(status: String, onGoToProfile: () -> Unit) {
+    val isSuspended = status == "SUSPENDED"
+    val containerColor = if (isSuspended) Color(0xFFF8D7DA) else Color(0xFFFFF3CD)
+    val contentColor = if (isSuspended) Color(0xFF721C24) else Color(0xFF856404)
+    val borderColor = if (isSuspended) Color(0xFFF5C6CB) else Color(0xFF856404)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3CD)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF856404))
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = if (status == "PENDING_DOCS") "Documents Required" else "Account Pending Approval",
+                text = when(status) {
+                    "PENDING_DOCS" -> "Documents Required"
+                    "SUSPENDED" -> "Account Suspended"
+                    else -> "Account Pending Approval"
+                },
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF856404)
+                color = contentColor
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = if (status == "PENDING_DOCS") 
-                    "Please upload required documents in your Profile to start receiving orders." 
-                    else "Your documents are under review. You'll be notified once approved.",
+                text = when(status) {
+                    "PENDING_DOCS" -> "Please upload required documents in your Profile to start receiving orders."
+                    "SUSPENDED" -> "Your account has been suspended. Please contact support for more information."
+                    else -> "Your documents are under review. You'll be notified once approved."
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF856404)
+                color = contentColor
             )
             if (status == "PENDING_DOCS") {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -525,7 +536,7 @@ fun RegistrationNotice(status: String, onGoToProfile: () -> Unit) {
                     onClick = onGoToProfile,
                     modifier = Modifier.height(32.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF856404))
+                    colors = ButtonDefaults.buttonColors(containerColor = contentColor)
                 ) {
                     Text("Go to Profile", fontSize = 12.sp)
                 }

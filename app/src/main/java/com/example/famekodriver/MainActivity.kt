@@ -85,6 +85,12 @@ class MainActivity : ComponentActivity() {
             android.util.Log.d("FamekoNav", "Attempting to navigate to Map...")
             val intent = Intent("com.example.famekodriver.driver.OPEN_MAP")
             intent.setClassName("com.example.famekodriver.driver", "com.example.famekodriver.driver.MainActivity")
+            
+            // Pass session info to the other app
+            intent.putExtra("driver_id", sessionManager.getDriverId())
+            intent.putExtra("driver_name", sessionManager.getDriverName())
+            intent.putExtra("driver_status", sessionManager.getDriverStatus())
+
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             startActivity(intent)
             android.util.Log.d("FamekoNav", "Navigation intent sent successfully")

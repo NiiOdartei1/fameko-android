@@ -18,9 +18,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val sessionManager = SessionManager(this)
 
-        // Check status on start
-        if (sessionManager.getDriverStatus() != "APPROVED") {
-            redirectToDashboard()
+        // Adopt session from Intent if provided (from the other module)
+        val intentDriverId = intent.getStringExtra("driver_id")
+        if (intentDriverId != null) {
+            val name = intent.getStringExtra("driver_name") ?: "Driver"
+            val status = intent.getStringExtra("driver_status") ?: "PENDING"
+            sessionManager.saveSession(intentDriverId, name, status)
+        }
+
+        // Check if logged in. If not, go to login.
+        if (!sessionManager.isLoggedIn()) {
+            val intent = Intent(this, DriverLoginActivity::class.java)
+            startActivity(intent)
+            finish()
             return
         }
 
@@ -49,20 +59,12 @@ class MainActivity : ComponentActivity() {
             while (true) {
                 delay(15000) // Poll every 15 seconds for map screen
                 repository.getDriverStatus(driverId).onSuccess { response ->
-                    if (response.status != "APPROVED") {
+                    if (response.status != sessionManager.getDriverStatus()) {
                         sessionManager.updateStatus(response.status)
-                        redirectToDashboard()
+                        // No redirect needed - MapScreen UI will update via SessionManager or internal state
                     }
                 }
             }
         }
-    }
-
-    private fun redirectToDashboard() {
-        val intent = Intent("com.example.famekodriver.OPEN_DASHBOARD")
-        intent.setClassName("com.example.famekodriver", "com.example.famekodriver.MainActivity")
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        startActivity(intent)
-        finish()
     }
 }

@@ -12,6 +12,7 @@ class SessionManager(context: Context) {
         private const val KEY_DRIVER_ID = "driverId"
         private const val KEY_DRIVER_NAME = "driverName"
         private const val KEY_DRIVER_STATUS = "driverStatus"
+        private const val KEY_IS_ONLINE = "isOnline"
     }
 
     fun saveSession(driverId: String, driverName: String, status: String = "PENDING") {
@@ -31,6 +32,12 @@ class SessionManager(context: Context) {
     fun getDriverName(): String? = prefs.getString(KEY_DRIVER_NAME, "Driver")
 
     fun getDriverStatus(): String = prefs.getString(KEY_DRIVER_STATUS, "PENDING_DOCS") ?: "PENDING_DOCS"
+
+    fun isOnline(): Boolean = prefs.getBoolean(KEY_IS_ONLINE, false)
+
+    fun setOnline(online: Boolean) {
+        prefs.edit().putBoolean(KEY_IS_ONLINE, online).apply()
+    }
 
     fun updateStatus(status: String) {
         prefs.edit().putString(KEY_DRIVER_STATUS, status).apply()

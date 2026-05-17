@@ -17,7 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.MyLocation
@@ -44,8 +44,7 @@ import com.example.famekodriver.core.domain.model.FamekoEvent
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
@@ -73,7 +72,7 @@ fun MapScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     
-    var isOnline by remember { mutableStateOf(false) }
+    var isOnline by remember { mutableStateOf(sessionManager.isOnline()) }
     
     var hasLocationPermission by remember {
         mutableStateOf(
@@ -116,17 +115,22 @@ fun MapScreen(
                 context.startService(intent)
             }
         } else {
-            intent.action = LocationService.ACTION_STOP
             context.stopService(intent)
         }
     }
 
     LaunchedEffect(isOnline) {
         val driverId = sessionManager.getDriverId() ?: return@LaunchedEffect
+        sessionManager.setOnline(isOnline)
+        scope.launch {
+            repository.updateOnlineStatus(driverId, isOnline)
+        }
+        
         if (isOnline) {
             repository.startWebSocket(driverId)
         } else {
             repository.stopWebSocket()
+            activeRequest = null
         }
     }
 
@@ -149,7 +153,7 @@ fun MapScreen(
     LaunchedEffect(hasLocationPermission, isOnline) {
         if (hasLocationPermission) {
             val driverId = sessionManager.getDriverId() ?: "DRIVER-1"
-            while (true) {
+            while (isActive) { // Use isActive for better coroutine handling
                 try {
                     // Always track location if we have a current delivery, otherwise only if online
                     if (isOnline || currentDelivery != null) {
@@ -179,6 +183,7 @@ fun MapScreen(
                         }
                     }
 
+                    // Only poll for available deliveries if online and NOT on a trip and NO active request
                     if (isOnline && currentDelivery == null && activeRequest == null) {
                         repository.getAvailableDeliveries().onSuccess { deliveries ->
                             if (deliveries.isNotEmpty()) {
@@ -190,6 +195,7 @@ fun MapScreen(
                     delay(10000) 
                 } catch (e: Exception) {
                     Log.e("MapScreen", "Error in background loop", e)
+                    delay(5000) // Avoid rapid retries on error
                 }
             }
         }
@@ -231,7 +237,7 @@ fun MapScreen(
                         Icon(Icons.Default.Person, contentDescription = "Profile")
                     }
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.Default.Logout, contentDescription = "Logout")
+                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -431,15 +437,80 @@ fun MapScreen(
             }
 
             activeRequest?.let { delivery ->
-                // ... (Request card code)
+                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f))) {
+                    Card(
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth(),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("New Delivery Request", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Gray)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Column {
+                                    Text("GHS ${String.format(Locale.getDefault(), "%.2f", delivery.estimatedEarnings)}", fontWeight = FontWeight.ExtraBold, fontSize = 28.sp, color = Color(0xFF28A745))
+                                    Text("Estimated Earnings", fontSize = 12.sp, color = Color.Gray)
+                                }
+                                Surface(color = Color(0xFFFFEAD1), shape = RoundedCornerShape(12.dp)) {
+                                    Text("${String.format(Locale.getDefault(), "%.1f", delivery.distanceKm)} km", modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), fontWeight = FontWeight.Bold, color = Color(0xFFE67E22))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.MyLocation, "Pickup", tint = Color(0xFF34D186), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(delivery.pickupLocation, fontSize = 14.sp, maxLines = 1)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Navigation, "Drop-off", tint = Color(0xFFDC3545), modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(delivery.dropoffLocation, fontSize = 14.sp, maxLines = 1)
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlinedButton(onClick = { activeRequest = null }, modifier = Modifier.weight(1f).height(56.dp), shape = RoundedCornerShape(12.dp)) {
+                                    Text("Ignore", color = Color.Gray)
+                                }
+                                Button(
+                                    onClick = {
+                                        isAccepting = true
+                                        scope.launch {
+                                            val driverId = sessionManager.getDriverId() ?: "DRIVER-1"
+                                            repository.acceptDelivery(driverId, delivery.id).onSuccess {
+                                                isAccepting = false
+                                                Toast.makeText(context, "Request Accepted!", Toast.LENGTH_SHORT).show()
+                                            }.onFailure { error ->
+                                                isAccepting = false
+                                                activeRequest = null
+                                                Toast.makeText(context, "Failed to accept: ${error.message}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1.5f).height(56.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28A745)),
+                                    enabled = !isAccepting
+                                ) {
+                                    if (isAccepting) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                                    } else {
+                                        Text("ACCEPT", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
-            if (currentDelivery == null && activeRequest == null) {
+            if (currentDelivery == null) {
                 Button(
                     onClick = { isOnline = !isOnline },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp)
+                        .padding(bottom = if (activeRequest != null) 420.dp else 32.dp) // Move way up if request is showing so it's clickable
                         .height(64.dp)
                         .fillMaxWidth(0.6f),
                     colors = ButtonDefaults.buttonColors(

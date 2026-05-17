@@ -92,14 +92,25 @@ class LocationService : Service() {
     }
 
     private fun stop() {
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        try {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        } catch (e: Exception) {
+            Log.e("LocationService", "Error removing updates", e)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            stopForeground(true)
+        }
         stopSelf()
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        try {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        } catch (_: Exception) {}
         serviceScope.cancel()
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

@@ -25,7 +25,7 @@ object NetworkClient {
     private val BASE_URL = if (USE_LOCAL_BACKEND) LOCAL_URL else PRODUCTION_URL
     private val ROUTING_URL = if (USE_LOCAL_BACKEND) LOCAL_ROUTING_URL else PRODUCTION_ROUTING_URL
 
-    private val okHttpClient by lazy {
+    val okHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(300, TimeUnit.SECONDS)
             .readTimeout(300, TimeUnit.SECONDS)

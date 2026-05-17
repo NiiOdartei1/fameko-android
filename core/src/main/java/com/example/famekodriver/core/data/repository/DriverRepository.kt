@@ -267,11 +267,9 @@ class DriverRepository {
         try {
             android.util.Log.d("FamekoUpload", "Starting Cloudinary upload for driver $driverId, type: $docType")
             
-            // 1. Upload to Cloudinary (Unsigned)
-            val cloudName = "df3jnubvy" 
-            val uploadPreset = "fameko_docs" // Ensure this is created as UNSIGNED in Cloudinary Dashboard
-            
-            val cloudinaryUrl = "https://api.cloudinary.com/v1_1/$cloudName/image/upload"
+            // Use raw OkHttp with the configured client for speed and timeouts
+            val cloudinaryUrl = "https://api.cloudinary.com/v1_1/df3jnubvy/image/upload"
+            val uploadPreset = "fameko_docs"
             
             val requestBody = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
@@ -284,11 +282,13 @@ class DriverRepository {
                 .post(requestBody)
                 .build()
 
-            val client = okhttp3.OkHttpClient()
+            val client = NetworkClient.okHttpClient // 5-minute timeout shared client
             val response = client.newCall(request).execute()
             
             if (!response.isSuccessful) {
-                throw Exception("Cloudinary upload failed: ${response.message}")
+                val errorMsg = response.body?.string() ?: response.message
+                android.util.Log.e("FamekoUpload", "Cloudinary HTTP error: $errorMsg")
+                throw Exception("Cloudinary upload failed: $errorMsg")
             }
 
             val responseBody = response.body?.string() ?: throw Exception("Empty response from Cloudinary")

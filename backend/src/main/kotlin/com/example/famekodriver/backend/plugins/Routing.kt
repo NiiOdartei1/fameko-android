@@ -184,35 +184,53 @@ fun Application.configureRouting() {
         }
 
         post("/driver/upload-document") {
+            println("RECEIVED: Request to upload document")
             try {
                 val multipartData = call.receiveMultipart()
                 var driverId: String? = null
                 var docType: String? = null
                 var fileName: String? = null
+                var fileBytes: ByteArray? = null
 
                 multipartData.forEachPart { part ->
+                    println("PROCESSING PART: ${part.name}")
                     when (part) {
                         is PartData.FormItem -> {
-                            if (part.name == "driver_id") driverId = part.value
-                            if (part.name == "doc_type") docType = part.value
+                            if (part.name == "driver_id") {
+                                driverId = part.value
+                                println("DRIVER ID: $driverId")
+                            }
+                            if (part.name == "doc_type") {
+                                docType = part.value
+                                println("DOC TYPE: $docType")
+                            }
                         }
                         is PartData.FileItem -> {
                             fileName = part.originalFileName
-                            // Save file bytes in real app
+                            fileBytes = part.streamProvider().readBytes()
+                            println("FILE RECEIVED: $fileName (${fileBytes?.size} bytes)")
                         }
                         else -> {}
                     }
                     part.dispose()
                 }
 
-                if (driverId != null && docType != null && fileName != null) {
-                    updateDriverDocument(driverId!!, docType!!, fileName!!)
+                if (driverId != null && docType != null && fileBytes != null) {
+                    println("SAVING DOCUMENT to DB for driver $driverId")
+                    updateDriverDocument(driverId!!, docType!!, fileName ?: "uploaded_file.jpg")
                     call.respond(AuthResponse(true, "Document uploaded successfully", driverId, null))
                 } else {
-                    call.respond(AuthResponse(false, "Missing upload data", null, null))
+                    val missing = mutableListOf<String>()
+                    if (driverId == null) missing.add("driver_id")
+                    if (docType == null) missing.add("doc_type")
+                    if (fileBytes == null) missing.add("file content")
+                    println("ERROR: Missing data: ${missing.joinToString(", ")}")
+                    call.respond(AuthResponse(false, "Missing upload data: ${missing.joinToString(", ")}", null, null))
                 }
             } catch (e: Exception) {
-                call.respond(AuthResponse(false, e.message ?: "Upload failed", null, null))
+                println("EXCEPTION during upload: ${e.message}")
+                e.printStackTrace()
+                call.respond(AuthResponse(false, "Upload failed: ${e.message}", null, null))
             }
         }
 

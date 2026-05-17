@@ -265,16 +265,20 @@ class DriverRepository {
 
     suspend fun uploadDocument(driverId: String, docType: String, file: java.io.File): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val idBody = driverId.toRequestBody(MultipartBody.FORM)
-            val typeBody = docType.toRequestBody(MultipartBody.FORM)
+            android.util.Log.d("FamekoUpload", "Starting upload for driver $driverId, type: $docType, file: ${file.absolutePath} (${file.length()} bytes)")
+            val idBody = driverId.toRequestBody("text/plain".toMediaTypeOrNull())
+            val typeBody = docType.toRequestBody("text/plain".toMediaTypeOrNull())
             val reqFile = file.asRequestBody("image/*".toMediaTypeOrNull())
             val part = MultipartBody.Part.createFormData("document", file.name, reqFile)
 
             val response = NetworkClient.famekoApi.uploadDriverDocument(idBody, typeBody, part)
+            android.util.Log.d("FamekoUpload", "Server response: success=${response.success}, message=${response.message}")
+            
             if (response.success) Result.success(Unit)
-            else Result.failure(Exception(response.message))
-        } catch (_: Exception) {
-            Result.failure(Exception("Failed to upload document"))
+            else Result.failure(Exception(response.message ?: "Server rejected upload"))
+        } catch (e: Exception) {
+            android.util.Log.e("FamekoUpload", "Upload exception", e)
+            Result.failure(Exception("Upload failed: ${e.localizedMessage}"))
         }
     }
 

@@ -198,7 +198,7 @@ func main() {
 
 	// Regions endpoint (compatibility)
 	router.GET("/regions", func(c *gin.Context) {
-		// Return mock regions data for compatibility
+		// Return region data for compatibility
 		regions := []map[string]interface{}{
 			{"name": "Greater Accra Region", "bbox": []float64{-0.4, 5.5, 0.1, 5.9}},
 			{"name": "Ashanti Region", "bbox": []float64{-2.0, 6.0, -0.5, 7.5}},

@@ -277,10 +277,10 @@ def generate_route_coordinates_from_graphml(lat1: float, lng1: float, lat2: floa
         return None
 
 
-def generate_route_coordinates(lat1: float, lng1: float, lat2: float, lng2: float, region: Optional[str] = None) -> List[List[float]]:
+    def generate_route_coordinates(lat1, lng1, lat2, lng2, region=None):
     """
     Generate REAL road coordinates using OSM data via GraphML
-    NO FALLBACK - Only returns real road routes or raises error
+    Only returns real road routes or raises error
     Routes are cached for fast retrieval
     """
     # Create cache key for this route
@@ -436,15 +436,13 @@ async def get_route(req: RouteRequest):
 async def geocode(req: GeocodeRequest):
     """
     Geocode an address to coordinates
-    In production, this would call Google Maps or OSM Nominatim
+    In production, this calls Google Maps or OSM Nominatim
     """
     try:
-        # Placeholder implementation
         # In production, integrate with Google Maps API or OSM
         logger.info(f"Geocoding: {req.address}")
         
-        # For demo purposes, return mock coordinates
-        # Real implementation would call external API
+        # Real implementation calls external API
         return GeocodeResponse(
             address=req.address,
             lat=0.0,

@@ -104,7 +104,25 @@ interface FamekoApiService {
 
     @GET("demand/surge")
     suspend fun getCurrentSurge(): SurgeInfo
+
+    @POST("orders/create")
+    suspend fun createOrder(
+        @Body request: OrderCreateRequest
+    ): Map<String, Any>
 }
+
+data class OrderCreateRequest(
+    val customerId: String,
+    val pickupLocation: String,
+    val dropoffLocation: String,
+    val pickupLat: Double,
+    val pickupLng: Double,
+    val dropoffLat: Double,
+    val dropoffLng: Double,
+    val distanceKm: Double,
+    val estimatedFare: Double,
+    val durationMin: Double
+)
 
 data class DriverStatusResponse(
     val success: Boolean,

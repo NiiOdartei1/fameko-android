@@ -335,7 +335,142 @@ fun Application.configureRouting() {
                 call.respond(surge)
             }
         }
+
+        route("/orders") {
+            post("/create") {
+                try {
+                    val req = call.receive<OrderCreateRequest>()
+                    val orderId = createOrderAndDelivery(req)
+                    if (orderId != null) {
+                        // DISPATCH INTELLIGENCE: Find closest drivers
+                        val nearbyDrivers = findNearbyDrivers(req.pickupLat, req.pickupLng, radiusKm = 5.0, limit = 5)
+                        
+                        val delivery = getDeliveryByOrderId(orderId)
+                        if (delivery != null) {
+                            // Push to nearby drivers only
+                            nearbyDrivers.forEach { driverId ->
+                                sendToUser(driverId.toString(), "NEW_DELIVERY", delivery)
+                            }
+                        }
+                        
+                        call.respond(mapOf("success" to true, "orderId" to orderId))
+                    } else {
+                        call.respond(mapOf("success" to false, "message" to "Failed to create order"))
+                    }
+                } catch (e: Exception) {
+                    call.respond(mapOf("success" to false, "message" to e.message))
+                }
+            }
+        }
     }
+}
+
+data class OrderCreateRequest(
+    val customerId: String,
+    val pickupLocation: String,
+    val dropoffLocation: String,
+    val pickupLat: Double,
+    val pickupLng: Double,
+    val dropoffLat: Double,
+    val dropoffLng: Double,
+    val distanceKm: Double,
+    val estimatedFare: Double,
+    val durationMin: Double
+)
+
+private fun findNearbyDrivers(lat: Double, lng: Double, radiusKm: Double, limit: Int): List<Int> {
+    val drivers = mutableListOf<Int>()
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = """
+            SELECT driver_id 
+            FROM driver_stats 
+            WHERE is_online = true 
+            AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
+            ORDER BY ST_Distance(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography)
+            LIMIT ?
+        """.trimIndent()
+        
+        val stmt = conn.prepareStatement(sql)
+        stmt.setDouble(1, lng) // Longitude first for ST_MakePoint
+        stmt.setDouble(2, lat)
+        stmt.setDouble(3, radiusKm * 1000) // ST_DWithin uses meters for geography
+        stmt.setDouble(4, lng)
+        stmt.setDouble(5, lat)
+        stmt.setInt(6, limit)
+        
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            drivers.add(rs.getInt("driver_id"))
+        }
+    }
+    return drivers
+}
+
+private fun createOrderAndDelivery(req: OrderCreateRequest): Int? {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        conn.autoCommit = false
+        try {
+            val orderSql = "INSERT INTO orders (customer_id, total_amount, shipping_name, shipping_address, shipping_phone) VALUES (?, ?, ?, ?, ?) RETURNING id"
+            val oStmt = conn.prepareStatement(orderSql)
+            oStmt.setInt(1, req.customerId.toInt())
+            oStmt.setDouble(2, req.estimatedFare)
+            oStmt.setString(3, "Customer") // Placeholder
+            oStmt.setString(4, req.dropoffLocation)
+            oStmt.setString(5, "0000000000") // Placeholder
+            val oRs = oStmt.executeQuery()
+            if (!oRs.next()) return null
+            val orderId = oRs.getInt(1)
+
+            val deliverySql = """
+                INSERT INTO deliveries (order_id, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, estimated_duration_minutes, estimated_earnings, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+            """.trimIndent()
+            val dStmt = conn.prepareStatement(deliverySql)
+            dStmt.setInt(1, orderId)
+            dStmt.setString(2, req.pickupLocation)
+            dStmt.setString(3, req.dropoffLocation)
+            dStmt.setDouble(4, req.pickupLat)
+            dStmt.setDouble(5, req.pickupLng)
+            dStmt.setDouble(6, req.dropoffLat)
+            dStmt.setDouble(7, req.dropoffLng)
+            dStmt.setDouble(8, req.distanceKm)
+            dStmt.setInt(9, req.durationMin.toInt())
+            dStmt.setDouble(10, req.estimatedFare * 0.8)
+            dStmt.executeUpdate()
+
+            conn.commit()
+            return orderId
+        } catch (e: Exception) {
+            conn.rollback()
+            throw e
+        }
+    }
+}
+
+private fun getDeliveryByOrderId(orderId: Int): Delivery? {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "SELECT * FROM deliveries WHERE order_id = ?"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, orderId)
+        val rs = stmt.executeQuery()
+        if (rs.next()) {
+            return Delivery(
+                id = rs.getString("id"),
+                orderId = rs.getInt("order_id"),
+                driverId = null,
+                pickupLocation = rs.getString("pickup_location"),
+                dropoffLocation = rs.getString("dropoff_location"),
+                pickupLat = rs.getDouble("pickup_lat"),
+                pickupLng = rs.getDouble("pickup_lng"),
+                dropoffLat = rs.getDouble("dropoff_lat"),
+                dropoffLng = rs.getDouble("dropoff_lng"),
+                status = DeliveryStatus.PENDING,
+                distanceKm = rs.getDouble("distance_km"),
+                estimatedEarnings = rs.getDouble("estimated_earnings")
+            )
+        }
+    }
+    return null
 }
 
 private fun calculateCurrentSurge(): SurgeInfo {

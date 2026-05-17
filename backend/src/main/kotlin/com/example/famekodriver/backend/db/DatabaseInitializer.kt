@@ -91,7 +91,27 @@ object DatabaseInitializer {
 
     private fun createTables(conn: Connection) {
         val statements = listOf(
-            // ... (rest of the statements)
+            "CREATE EXTENSION IF NOT EXISTS postgis;",
+            """
+            CREATE TABLE IF NOT EXISTS driver_stats (
+                driver_id INTEGER PRIMARY KEY REFERENCES drivers(id),
+                is_online BOOLEAN DEFAULT FALSE,
+                active_deliveries INTEGER DEFAULT 0,
+                completed_today INTEGER DEFAULT 0,
+                earnings_today NUMERIC(12, 2) DEFAULT 0.0,
+                rating DOUBLE PRECISION DEFAULT 5.0,
+                rating_count INTEGER DEFAULT 0,
+                total_deliveries INTEGER DEFAULT 0,
+                completion_rate INTEGER DEFAULT 100,
+                total_earnings NUMERIC(12, 2) DEFAULT 0.0,
+                latitude DOUBLE PRECISION,
+                longitude DOUBLE PRECISION,
+                location GEOGRAPHY(POINT, 4326),
+                bearing REAL DEFAULT 0.0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """.trimIndent(),
+            "CREATE INDEX IF NOT EXISTS driver_stats_location_idx ON driver_stats USING GIST (location);",
             """
             CREATE TABLE IF NOT EXISTS customers (
                 id SERIAL PRIMARY KEY,

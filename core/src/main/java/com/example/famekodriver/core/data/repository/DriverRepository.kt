@@ -4,6 +4,7 @@ import com.example.famekodriver.core.domain.model.*
 import com.example.famekodriver.core.network.DatabaseConfig
 import com.example.famekodriver.core.network.NetworkClient
 import com.example.famekodriver.core.network.DriverStatusResponse
+import com.example.famekodriver.core.network.OrderCreateRequest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -429,12 +430,19 @@ class DriverRepository {
                 DatabaseConfig.DB_USER,
                 DatabaseConfig.DB_PASS,
             ).use { connection ->
-                val query = "UPDATE driver_stats SET latitude = ?, longitude = ?, bearing = ? WHERE driver_id = ?"
+                val query = """
+                    UPDATE driver_stats 
+                    SET latitude = ?, longitude = ?, bearing = ?, 
+                        location = ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography 
+                    WHERE driver_id = ?
+                """.trimIndent()
                 connection.prepareStatement(query).use { stmt ->
                     stmt.setDouble(1, lat)
                     stmt.setDouble(2, lng)
                     stmt.setFloat(3, bearing)
-                    stmt.setString(4, driverId)
+                    stmt.setDouble(4, lng) // Longitude first for ST_MakePoint
+                    stmt.setDouble(5, lat)
+                    stmt.setString(6, driverId)
                     stmt.executeUpdate()
                     Result.success(Unit)
                 }
@@ -546,59 +554,74 @@ class DriverRepository {
         durationMin: Double
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            ensureDriverLoaded()
-            DriverManager.getConnection(
-                DatabaseConfig.getJdbcUrl(),
-                DatabaseConfig.DB_USER,
-                DatabaseConfig.DB_PASS,
-            ).use { connection ->
-                connection.autoCommit = false
-                try {
-                    // 1. Create Order
-                    val orderQuery = """
-                        INSERT INTO orders (customer_id, total_amount, status, latitude, longitude, payment_method) 
-                        VALUES (?, ?, 'Pending', ?, ?, 'Cash on Delivery') RETURNING id
-                    """.trimIndent()
-                    
-                    val orderId = connection.prepareStatement(orderQuery).use { stmt ->
-                        stmt.setInt(1, customerId.toInt())
-                        stmt.setDouble(2, estimatedFare)
-                        stmt.setDouble(3, dropoffLat)
-                        stmt.setDouble(4, dropoffLng)
-                        val rs = stmt.executeQuery()
-                        if (rs.next()) rs.getInt(1) else throw Exception("Failed to create order")
-                    }
-
-                    // 2. Create Delivery
-                    val deliveryQuery = """
-                        INSERT INTO deliveries (order_id, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, estimated_duration_minutes, status, service_type, estimated_earnings)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'package_delivery', ?)
-                    """.trimIndent()
-
-                    connection.prepareStatement(deliveryQuery).use { stmt ->
-                        stmt.setInt(1, orderId)
-                        stmt.setString(2, pickupLocation)
-                        stmt.setString(3, dropoffLocation)
-                        stmt.setDouble(4, pickupLat)
-                        stmt.setDouble(5, pickupLng)
-                        stmt.setDouble(6, dropoffLat)
-                        stmt.setDouble(7, dropoffLng)
-                        stmt.setDouble(8, distanceKm)
-                        stmt.setDouble(9, durationMin)
-                        stmt.setDouble(10, estimatedFare * 0.8) // 80% to driver
-                        stmt.executeUpdate()
-                    }
-                    
-                    connection.commit()
-                    Result.success(orderId.toString())
-                } catch (e: Exception) {
-                    connection.rollback()
-                    Result.failure(e)
-                }
+            val request = OrderCreateRequest(
+                customerId, pickupLocation, dropoffLocation,
+                pickupLat, pickupLng, dropoffLat, dropoffLng,
+                distanceKm, estimatedFare, durationMin
+            )
+            val response = NetworkClient.famekoApi.createOrder(request)
+            if (response["success"] == true) {
+                Result.success(response["orderId"].toString())
+            } else {
+                Result.failure(Exception(response["message"]?.toString() ?: "Unknown error"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Order creation failed", e)
-            Result.failure(e)
+            android.util.Log.e("FamekoRepo", "Order creation via API failed, falling back to JDBC", e)
+            try {
+                ensureDriverLoaded()
+                DriverManager.getConnection(
+                    DatabaseConfig.getJdbcUrl(),
+                    DatabaseConfig.DB_USER,
+                    DatabaseConfig.DB_PASS,
+                ).use { connection ->
+                    connection.autoCommit = false
+                    try {
+                        // 1. Create Order
+                        val orderQuery = """
+                            INSERT INTO orders (customer_id, total_amount, status, latitude, longitude, payment_method, shipping_name, shipping_address, shipping_phone) 
+                            VALUES (?, ?, 'Pending', ?, ?, 'Cash on Delivery', 'Customer', ?, '0000000000') RETURNING id
+                        """.trimIndent()
+                        
+                        val orderId = connection.prepareStatement(orderQuery).use { stmt ->
+                            stmt.setInt(1, customerId.toInt())
+                            stmt.setDouble(2, estimatedFare)
+                            stmt.setDouble(3, dropoffLat)
+                            stmt.setDouble(4, dropoffLng)
+                            stmt.setString(5, dropoffLocation)
+                            val rs = stmt.executeQuery()
+                            if (rs.next()) rs.getInt(1) else throw Exception("Failed to create order")
+                        }
+
+                        // 2. Create Delivery
+                        val deliveryQuery = """
+                            INSERT INTO deliveries (order_id, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, estimated_duration_minutes, status, service_type, estimated_earnings)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 'package_delivery', ?)
+                        """.trimIndent()
+
+                        connection.prepareStatement(deliveryQuery).use { stmt ->
+                            stmt.setInt(1, orderId)
+                            stmt.setString(2, pickupLocation)
+                            stmt.setString(3, dropoffLocation)
+                            stmt.setDouble(4, pickupLat)
+                            stmt.setDouble(5, pickupLng)
+                            stmt.setDouble(6, dropoffLat)
+                            stmt.setDouble(7, dropoffLng)
+                            stmt.setDouble(8, distanceKm)
+                            stmt.setDouble(9, durationMin)
+                            stmt.setDouble(10, estimatedFare * 0.8) // 80% to driver
+                            stmt.executeUpdate()
+                        }
+                        
+                        connection.commit()
+                        Result.success(orderId.toString())
+                    } catch (e: Exception) {
+                        connection.rollback()
+                        Result.failure(e)
+                    }
+                }
+            } catch (e2: Exception) {
+                Result.failure(e2)
+            }
         }
     }
 

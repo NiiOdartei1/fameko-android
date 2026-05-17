@@ -18,7 +18,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "FamekoDriver"
 include(":app")
-include(":app-driver")
 include(":app-customer")
 include(":core")
 include(":shared-models")

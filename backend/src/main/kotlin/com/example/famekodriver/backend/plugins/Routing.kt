@@ -11,6 +11,10 @@ import com.example.famekodriver.core.domain.model.*
 import com.example.famekodriver.backend.db.DatabaseInitializer
 import java.sql.Connection
 import java.sql.ResultSet
+import java.net.URL
+import java.net.HttpURLConnection
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 
 fun Application.configureRouting() {
     routing {
@@ -193,14 +197,37 @@ fun Application.configureRouting() {
         }
 
         get("/customer/geocode") {
-            // Native geocoding placeholder
             val query = call.parameters["q"] ?: ""
-            // Return some mock suggestions for Ghana
-            val suggestions = listOf(
-                LocationSuggestion("Mock: $query", "5.6037", "-0.1870"),
-                LocationSuggestion("Accra Mall", "5.6177", "-0.1733")
-            )
-            call.respond(suggestions)
+            if (query.length < 3) {
+                call.respond(emptyList<LocationSuggestion>())
+                return@get
+            }
+
+            try {
+                val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+                val url = URL("https://nominatim.openstreetmap.org/search?format=json&q=$encodedQuery&limit=5&countrycodes=gh&addressdetails=1")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.setRequestProperty("User-Agent", "FamekoBackend/1.0")
+                
+                val response = connection.inputStream.bufferedReader().use { it.readText() }
+                val gson = Gson()
+                val listType = object : TypeToken<List<Map<String, Any>>>() {}.type
+                val results: List<Map<String, Any>> = gson.fromJson(response, listType)
+                
+                val suggestions = results.map {
+                    LocationSuggestion(
+                        displayName = it["display_name"] as String,
+                        latitude = it["lat"] as String,
+                        longitude = it["lon"] as String,
+                        name = (it["display_name"] as String).split(",")[0],
+                        type = "address"
+                    )
+                }
+                call.respond(suggestions)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                call.respond(emptyList<LocationSuggestion>())
+            }
         }
 
         post("/driver/register") {

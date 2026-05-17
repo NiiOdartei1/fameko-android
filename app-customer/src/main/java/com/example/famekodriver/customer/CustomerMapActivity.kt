@@ -347,9 +347,15 @@ fun CustomerMapScreen() {
                             LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
                                 items(pickupSuggestions) { suggestion ->
                                     ListItem(
-                                        headlineContent = { Text(suggestion.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        headlineContent = { Text(suggestion.name ?: suggestion.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) },
                                         supportingContent = { Text(suggestion.displayName, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.Gray) },
-                                        leadingContent = { Icon(Icons.Default.History, null, tint = Color.LightGray) },
+                                        leadingContent = { 
+                                            Icon(
+                                                if (suggestion.type == "coordinate") Icons.Default.LocationSearching else Icons.Default.History, 
+                                                null, 
+                                                tint = Color(0xFF004E89).copy(alpha = 0.6f)
+                                            ) 
+                                        },
                                         modifier = Modifier.clickable {
                                             pickupLocation = suggestion.displayName
                                             pickupGeoPoint = GeoPoint(suggestion.latitude.toDouble(), suggestion.longitude.toDouble())
@@ -400,9 +406,15 @@ fun CustomerMapScreen() {
                             LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
                                 items(dropoffSuggestions) { suggestion ->
                                     ListItem(
-                                        headlineContent = { Text(suggestion.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        headlineContent = { Text(suggestion.name ?: suggestion.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) },
                                         supportingContent = { Text(suggestion.displayName, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.Gray) },
-                                        leadingContent = { Icon(Icons.Default.LocationSearching, null, tint = Color.LightGray) },
+                                        leadingContent = { 
+                                            Icon(
+                                                if (suggestion.type == "coordinate") Icons.Default.LocationSearching else Icons.Default.LocationOn, 
+                                                null, 
+                                                tint = Color(0xFFDC3545).copy(alpha = 0.6f)
+                                            ) 
+                                        },
                                         modifier = Modifier.clickable {
                                             dropoffLocation = suggestion.displayName
                                             dropoffGeoPoint = GeoPoint(suggestion.latitude.toDouble(), suggestion.longitude.toDouble())

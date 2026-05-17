@@ -13,5 +13,8 @@ data class LocationSuggestion(
     val latitude: String,
     
     @SerializedName("lon")
-    val longitude: String
+    val longitude: String,
+
+    val name: String? = null,
+    val type: String? = "address"
 )

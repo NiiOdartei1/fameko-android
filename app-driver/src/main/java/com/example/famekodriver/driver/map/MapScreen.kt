@@ -95,6 +95,7 @@ fun MapScreen(
     
     // Stats for overlay
     var driverStats by remember { mutableStateOf(DriverStats()) }
+    var driverStatus by remember { mutableStateOf(sessionManager.getDriverStatus()) }
     
     // Navigation polyline
     var navigationPath by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
@@ -118,6 +119,10 @@ fun MapScreen(
                         }
                     
                     // Update stats
+                    repository.getDriverStatus(driverId).onSuccess { 
+                        driverStatus = it.status
+                        sessionManager.updateStatus(it.status)
+                    }
                     repository.getDriverStats(driverId).onSuccess { stats -> driverStats = stats }
                     
                     // Check if driver already has an active delivery
@@ -250,28 +255,40 @@ fun MapScreen(
             )
 
             // Earnings Overlay at the top
-            Card(
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(16.dp)
                     .fillMaxWidth(0.9f),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
-                elevation = CardDefaults.cardElevation(4.dp)
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                if (driverStatus != "APPROVED") {
+                    RegistrationNotice(
+                        status = driverStatus,
+                        onGoToProfile = onNavigateToProfile
+                    )
+                }
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
+                    elevation = CardDefaults.cardElevation(4.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("TODAY'S EARNINGS", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                        Text("₵${String.format(Locale.getDefault(), "%.2f", driverStats.earningsToday)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF28A745))
-                    }
-                    VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 16.dp), color = Color.LightGray)
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("COMPLETED", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                        Text("${driverStats.completedToday}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF004E89))
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("TODAY'S EARNINGS", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                            Text("₵${String.format(Locale.getDefault(), "%.2f", driverStats.earningsToday)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF28A745))
+                        }
+                        VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 16.dp), color = Color.LightGray)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("COMPLETED", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                            Text("${driverStats.completedToday}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF004E89))
+                        }
                     }
                 }
             }
@@ -474,6 +491,43 @@ fun MapScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RegistrationNotice(status: String, onGoToProfile: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3CD)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF856404))
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = if (status == "PENDING_DOCS") "Documents Required" else "Account Pending Approval",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF856404)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (status == "PENDING_DOCS") 
+                    "Please upload required documents in your Profile to start receiving orders." 
+                    else "Your documents are under review. You'll be notified once approved.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF856404)
+            )
+            if (status == "PENDING_DOCS") {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onGoToProfile,
+                    modifier = Modifier.height(32.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF856404))
+                ) {
+                    Text("Go to Profile", fontSize = 12.sp)
                 }
             }
         }

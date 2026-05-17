@@ -32,12 +32,12 @@ class DriverRepository {
     suspend fun login(email: String, pass: String): Result<Driver?> = withContext(Dispatchers.IO) {
         try {
             val response = NetworkClient.famekoApi.loginDriver(LoginRequest(email, pass))
-            if (response.success && response.userId != null) {
+            if (response.success && response.user_id != null) {
                 // In a real app, we'd fetch the full driver object here
                 // For now, construct a minimal one from the auth response
                 Result.success(Driver(
-                    id = response.userId.toInt(),
-                    fullName = response.userName ?: "Driver",
+                    id = response.user_id.toInt(),
+                    fullName = response.name ?: "Driver",
                     email = email,
                     phone = "",
                     region = "",
@@ -115,8 +115,8 @@ class DriverRepository {
                     }
                 }
             }
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {
+            Result.failure(Exception("Failed to fetch driver stats"))
         }
     }
 
@@ -142,8 +142,8 @@ class DriverRepository {
                     Result.success(list)
                 }
             }
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {
+            Result.failure(Exception("Failed to fetch recent deliveries"))
         }
     }
 
@@ -166,8 +166,8 @@ class DriverRepository {
                     Result.success(Unit)
                 }
             }
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {
+            Result.failure(Exception("Failed to update status"))
         }
     }
 
@@ -320,8 +320,8 @@ class DriverRepository {
             val response = NetworkClient.famekoApi.uploadDriverDocument(idBody, typeBody, part)
             if (response.success) Result.success(Unit)
             else Result.failure(Exception(response.message))
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {
+            Result.failure(Exception("Failed to upload document"))
         }
     }
 
@@ -329,8 +329,8 @@ class DriverRepository {
         try {
             val response = NetworkClient.famekoApi.getDriverStatus(driverId)
             Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {
+            Result.failure(Exception("Failed to get driver status"))
         }
     }
 
@@ -343,7 +343,7 @@ class DriverRepository {
                 while (rs.next()) list.add(rs.toDelivery())
                 Result.success(list)
             }
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (_: Exception) { Result.failure(Exception("Failed to fetch available deliveries")) }
     }
 
     suspend fun getMyDeliveries(driverId: String): Result<List<Delivery>> = withContext(Dispatchers.IO) {
@@ -357,7 +357,7 @@ class DriverRepository {
                 while (rs.next()) list.add(rs.toDelivery())
                 Result.success(list)
             }
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (_: Exception) { Result.failure(Exception("Failed to fetch your deliveries")) }
     }
 
     suspend fun acceptDelivery(driverId: String, deliveryId: String): Result<Unit> = withContext(Dispatchers.IO) {
@@ -370,7 +370,7 @@ class DriverRepository {
                 stmt.executeUpdate()
                 Result.success(Unit)
             }
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (_: Exception) { Result.failure(Exception("Failed to accept delivery")) }
     }
 
     suspend fun updateDeliveryStatus(deliveryId: String, status: DeliveryStatus): Result<Unit> = withContext(Dispatchers.IO) {
@@ -383,7 +383,7 @@ class DriverRepository {
                 stmt.executeUpdate()
                 Result.success(Unit)
             }
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (_: Exception) { Result.failure(Exception("Failed to update delivery status")) }
     }
 
     suspend fun updateLocation(driverId: String, lat: Double, lng: Double, bearing: Float): Result<Unit> = withContext(Dispatchers.IO) {
@@ -404,8 +404,8 @@ class DriverRepository {
                     Result.success(Unit)
                 }
             }
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {
+            Result.failure(Exception("Failed to update location"))
         }
     }
 
@@ -413,8 +413,8 @@ class DriverRepository {
         try {
             val response = NetworkClient.routingApi.calculateRoute(request)
             Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (_: Exception) {
+            Result.failure(Exception("Failed to calculate route"))
         }
     }
 
@@ -481,7 +481,7 @@ class DriverRepository {
                     Result.success(orderId.toString())
                 } catch (e: Exception) {
                     connection.rollback()
-                    throw e
+                    Result.failure(e)
                 }
             }
         } catch (e: Exception) {
@@ -517,7 +517,7 @@ class DriverRepository {
             dropoffLng = getDouble("dropoff_lng"),
             status = try { 
                 DeliveryStatus.valueOf(getString("status").uppercase()) 
-            } catch (e: Exception) { 
+            } catch (_: Exception) {
                 DeliveryStatus.PENDING 
             },
             distanceKm = getDouble("distance_km"),

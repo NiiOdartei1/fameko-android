@@ -167,6 +167,31 @@ fun Application.configureRouting() {
             }
         }
 
+        get("/driver/status/{id}") {
+            val id = call.parameters["id"] ?: return@get call.respond(AuthResponse(false, "Missing ID", null, null))
+            val statusData = getDriverStatusFromDb(id)
+            call.respond(statusData)
+        }
+
+        get("/driver/nearby") {
+            val lat = call.parameters["lat"]?.toDoubleOrNull() ?: 0.0
+            val lng = call.parameters["lng"]?.toDoubleOrNull() ?: 0.0
+            val radius = call.parameters["radius"]?.toDoubleOrNull() ?: 5.0
+            val drivers = getNearbyDriverLocations(lat, lng, radius)
+            call.respond(drivers)
+        }
+
+        get("/orders/status/{orderId}") {
+            val orderId = call.parameters["orderId"]?.toIntOrNull()
+            if (orderId == null) {
+                call.respond(mapOf("success" to false, "message" to "Invalid Order ID"))
+                return@get
+            }
+            
+            val status = getDetailedOrderStatus(orderId)
+            call.respond(status)
+        }
+
         get("/customer/geocode") {
             // Native geocoding placeholder
             val query = call.parameters["q"] ?: ""
@@ -562,6 +587,65 @@ private fun getWalletBalance(driverId: Int): Double {
         val rs = stmt.executeQuery()
         return if (rs.next()) rs.getDouble("balance") else 0.0
     }
+}
+
+private fun getDetailedOrderStatus(orderId: Int): Map<String, Any> {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = """
+            SELECT o.status as order_status, d.status as delivery_status, 
+                   dr.full_name, dr.phone, dr.vehicle_type, dr.rating,
+                   ds.latitude, ds.longitude
+            FROM orders o
+            LEFT JOIN deliveries d ON o.id = d.order_id
+            LEFT JOIN drivers dr ON d.driver_id = dr.id
+            LEFT JOIN driver_stats ds ON dr.id = ds.driver_id
+            WHERE o.id = ?
+        """.trimIndent()
+        
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, orderId)
+        val rs = stmt.executeQuery()
+        if (rs.next()) {
+            val status = rs.getString("delivery_status") ?: rs.getString("order_status")
+            return mapOf(
+                "success" to true,
+                "status" to status,
+                "driverName" to (rs.getString("full_name") ?: ""),
+                "driverPhone" to (rs.getString("phone") ?: ""),
+                "driverVehicle" to (rs.getString("vehicle_type") ?: ""),
+                "driverLat" to rs.getDouble("latitude"),
+                "driverLng" to rs.getDouble("longitude"),
+                "driverRating" to rs.getDouble("rating")
+            )
+        }
+    }
+    return mapOf("success" to false, "status" to "NOT_FOUND")
+}
+
+private fun getNearbyDriverLocations(lat: Double, lng: Double, radiusKm: Double): List<DriverLocation> {
+    val drivers = mutableListOf<DriverLocation>()
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = """
+            SELECT driver_id, latitude, longitude, bearing 
+            FROM driver_stats 
+            WHERE is_online = true 
+            AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
+        """.trimIndent()
+        val stmt = conn.prepareStatement(sql)
+        stmt.setDouble(1, lng) // Longitude first for ST_MakePoint
+        stmt.setDouble(2, lat)
+        stmt.setDouble(3, radiusKm * 1000)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            drivers.add(DriverLocation(
+                id = rs.getInt("driver_id").toString(),
+                latitude = rs.getDouble("latitude"),
+                longitude = rs.getDouble("longitude"),
+                bearing = rs.getFloat("bearing")
+            ))
+        }
+    }
+    return drivers
 }
 
 private fun getWalletTransactions(driverId: Int): List<Map<String, Any>> {

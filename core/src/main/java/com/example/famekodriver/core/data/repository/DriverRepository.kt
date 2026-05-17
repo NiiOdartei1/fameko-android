@@ -5,6 +5,7 @@ import com.example.famekodriver.core.network.DatabaseConfig
 import com.example.famekodriver.core.network.NetworkClient
 import com.example.famekodriver.core.network.DriverStatusResponse
 import com.example.famekodriver.core.network.OrderCreateRequest
+import com.example.famekodriver.core.network.OrderStatusResponse
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -532,6 +533,33 @@ class DriverRepository {
     suspend fun getCurrentSurge(): Result<SurgeInfo> = withContext(Dispatchers.IO) {
         try {
             val response = NetworkClient.famekoApi.getCurrentSurge()
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getNearbyDrivers(lat: Double, lng: Double): Result<List<DriverLocation>> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getNearbyDrivers(lat, lng)
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getOrderStatus(orderId: Int): Result<OrderStatusResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getOrderStatus(orderId)
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getGeocodeSuggestions(query: String): Result<List<LocationSuggestion>> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getSuggestions(query)
             Result.success(response)
         } catch (e: Exception) {
             Result.failure(e)

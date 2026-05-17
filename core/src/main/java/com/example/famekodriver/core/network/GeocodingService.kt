@@ -109,6 +109,18 @@ interface FamekoApiService {
     suspend fun createOrder(
         @Body request: OrderCreateRequest
     ): Map<String, Any>
+
+    @GET("orders/status/{orderId}")
+    suspend fun getOrderStatus(
+        @Path("orderId") orderId: Int
+    ): OrderStatusResponse
+
+    @GET("driver/nearby")
+    suspend fun getNearbyDrivers(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("radius") radius: Double = 5.0
+    ): List<DriverLocation>
 }
 
 data class OrderCreateRequest(
@@ -122,6 +134,17 @@ data class OrderCreateRequest(
     val distanceKm: Double,
     val estimatedFare: Double,
     val durationMin: Double
+)
+
+data class OrderStatusResponse(
+    val success: Boolean,
+    val status: String,
+    val driverName: String? = null,
+    val driverPhone: String? = null,
+    val driverVehicle: String? = null,
+    val driverLat: Double? = null,
+    val driverLng: Double? = null,
+    val driverRating: Double? = null
 )
 
 data class DriverStatusResponse(

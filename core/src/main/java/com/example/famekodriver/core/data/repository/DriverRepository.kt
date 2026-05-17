@@ -146,6 +146,50 @@ class DriverRepository {
     }
 
     /**
+     * Authenticates a customer
+     */
+    suspend fun customerLogin(email: String, pass: String): Result<Pair<String, String>> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.loginCustomer(LoginRequest(email, pass))
+            val userId = response.user_id
+            if (response.success && userId != null) {
+                Result.success(Pair(userId, response.name ?: "Customer"))
+            } else {
+                Result.failure(Exception(response.message ?: "Login failed"))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("FamekoRepo", "Customer API Login failed, falling back to JDBC", e)
+            try {
+                ensureDriverLoaded()
+                val url = DatabaseConfig.getJdbcUrl()
+                if (url.isEmpty()) return@withContext Result.failure(e)
+
+                DriverManager.getConnection(
+                    url,
+                    DatabaseConfig.DB_USER,
+                    DatabaseConfig.DB_PASS,
+                ).use { connection ->
+                    val query = "SELECT id, name FROM customers WHERE email = ? AND password = ?"
+                    connection.prepareStatement(query).use { stmt ->
+                        stmt.setString(1, email)
+                        stmt.setString(2, pass)
+                        val rs = stmt.executeQuery()
+                        if (rs.next()) {
+                            val id = rs.getInt("id").toString()
+                            val name = rs.getString("name") ?: "Customer"
+                            Result.success(Pair(id, name))
+                        } else {
+                            Result.failure(Exception("Invalid email or password"))
+                        }
+                    }
+                }
+            } catch (e2: Exception) {
+                Result.failure(e2)
+            }
+        }
+    }
+
+    /**
      * Fetches driver statistics
      */
     suspend fun getDriverStats(driverId: String): Result<DriverStats> = withContext(Dispatchers.IO) {
@@ -559,10 +603,24 @@ class DriverRepository {
 
     suspend fun getGeocodeSuggestions(query: String): Result<List<LocationSuggestion>> = withContext(Dispatchers.IO) {
         try {
+            // First try Backend API
             val response = NetworkClient.famekoApi.getSuggestions(query)
-            Result.success(response)
+            if (response.isNotEmpty()) {
+                Result.success(response)
+            } else {
+                // Fallback to OSM directly if backend returns nothing
+                val osmResponse = NetworkClient.osmService.search(query)
+                Result.success(osmResponse)
+            }
         } catch (e: Exception) {
-            Result.failure(e)
+            android.util.Log.e("FamekoRepo", "Geocode API failed, falling back to OSM", e)
+            try {
+                // Fallback to OSM directly on error
+                val osmResponse = NetworkClient.osmService.search(query)
+                Result.success(osmResponse)
+            } catch (e2: Exception) {
+                Result.failure(e2)
+            }
         }
     }
 

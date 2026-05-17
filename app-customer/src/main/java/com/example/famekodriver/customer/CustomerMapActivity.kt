@@ -33,10 +33,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -145,6 +148,11 @@ fun CustomerMapScreen() {
     var currentOrderId by remember { mutableStateOf<Int?>(null) }
     var orderStatusData by remember { mutableStateOf<OrderStatusResponse?>(null) }
 
+    var isPickupFocused by remember { mutableStateOf(false) }
+    var isDropoffFocused by remember { mutableStateOf(false) }
+
+    val focusManager = LocalFocusManager.current
+
     LaunchedEffect(currentOrderId) {
         if (currentOrderId != null) {
             while (true) {
@@ -162,20 +170,20 @@ fun CustomerMapScreen() {
     var pickupSuggestions by remember { mutableStateOf<List<com.example.famekodriver.core.domain.model.LocationSuggestion>>(emptyList()) }
     var dropoffSuggestions by remember { mutableStateOf<List<com.example.famekodriver.core.domain.model.LocationSuggestion>>(emptyList()) }
 
-    LaunchedEffect(pickupLocation) {
-        if (pickupLocation.length > 2 && pickupGeoPoint == null) {
-            delay(500)
+    LaunchedEffect(pickupLocation, isPickupFocused) {
+        if (isPickupFocused && pickupLocation.length > 2 && pickupGeoPoint == null) {
+            delay(300)
             repository.getGeocodeSuggestions(pickupLocation).onSuccess { pickupSuggestions = it }
-        } else {
+        } else if (!isPickupFocused || pickupLocation.isEmpty()) {
             pickupSuggestions = emptyList()
         }
     }
 
-    LaunchedEffect(dropoffLocation) {
-        if (dropoffLocation.length > 2 && dropoffGeoPoint == null) {
-            delay(500)
+    LaunchedEffect(dropoffLocation, isDropoffFocused) {
+        if (isDropoffFocused && dropoffLocation.length > 2 && dropoffGeoPoint == null) {
+            delay(300)
             repository.getGeocodeSuggestions(dropoffLocation).onSuccess { dropoffSuggestions = it }
-        } else {
+        } else if (!isDropoffFocused || dropoffLocation.isEmpty()) {
             dropoffSuggestions = emptyList()
         }
     }
@@ -314,25 +322,40 @@ fun CustomerMapScreen() {
                                 polylineGeoPoints = emptyList()
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().onFocusChanged { isPickupFocused = it.isFocused },
                         placeholder = { Text("Pickup Location") },
                         leadingIcon = { Icon(Icons.Default.MyLocation, null, tint = Color(0xFF34D186)) },
+                        trailingIcon = {
+                            if (pickupLocation.isNotEmpty() && isPickupFocused) {
+                                IconButton(onClick = { pickupLocation = ""; pickupGeoPoint = null }) {
+                                    Icon(Icons.Default.Close, null)
+                                }
+                            }
+                        },
                         colors = TextFieldDefaults.colors(focusedContainerColor = Color(0xFFF6F6F6), unfocusedContainerColor = Color(0xFFF6F6F6), focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true,
                         enabled = !isLoading && currentOrderId == null
                     )
                     
-                    if (pickupSuggestions.isNotEmpty()) {
-                        Card(modifier = Modifier.fillMaxWidth().padding(top = 2.dp), elevation = CardDefaults.cardElevation(4.dp)) {
-                            LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                    if (pickupSuggestions.isNotEmpty() && isPickupFocused) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            elevation = CardDefaults.cardElevation(6.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
+                        ) {
+                            LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
                                 items(pickupSuggestions) { suggestion ->
                                     ListItem(
-                                        headlineContent = { Text(suggestion.displayName) },
+                                        headlineContent = { Text(suggestion.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        supportingContent = { Text(suggestion.displayName, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.Gray) },
+                                        leadingContent = { Icon(Icons.Default.History, null, tint = Color.LightGray) },
                                         modifier = Modifier.clickable {
                                             pickupLocation = suggestion.displayName
                                             pickupGeoPoint = GeoPoint(suggestion.latitude.toDouble(), suggestion.longitude.toDouble())
                                             pickupSuggestions = emptyList()
+                                            isPickupFocused = false
+                                            focusManager.clearFocus()
                                         }
                                     )
                                 }
@@ -352,25 +375,40 @@ fun CustomerMapScreen() {
                                 polylineGeoPoints = emptyList()
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().onFocusChanged { isDropoffFocused = it.isFocused },
                         placeholder = { Text("Where to?") },
                         leadingIcon = { Icon(Icons.Default.LocationOn, null, tint = Color(0xFFDC3545)) },
+                        trailingIcon = {
+                            if (dropoffLocation.isNotEmpty() && isDropoffFocused) {
+                                IconButton(onClick = { dropoffLocation = ""; dropoffGeoPoint = null }) {
+                                    Icon(Icons.Default.Close, null)
+                                }
+                            }
+                        },
                         colors = TextFieldDefaults.colors(focusedContainerColor = Color(0xFFF6F6F6), unfocusedContainerColor = Color(0xFFF6F6F6), focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true,
                         enabled = !isLoading && currentOrderId == null
                     )
 
-                    if (dropoffSuggestions.isNotEmpty()) {
-                        Card(modifier = Modifier.fillMaxWidth().padding(top = 2.dp), elevation = CardDefaults.cardElevation(4.dp)) {
-                            LazyColumn(modifier = Modifier.heightIn(max = 200.dp)) {
+                    if (dropoffSuggestions.isNotEmpty() && isDropoffFocused) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            elevation = CardDefaults.cardElevation(6.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White)
+                        ) {
+                            LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
                                 items(dropoffSuggestions) { suggestion ->
                                     ListItem(
-                                        headlineContent = { Text(suggestion.displayName) },
+                                        headlineContent = { Text(suggestion.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        supportingContent = { Text(suggestion.displayName, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.Gray) },
+                                        leadingContent = { Icon(Icons.Default.LocationSearching, null, tint = Color.LightGray) },
                                         modifier = Modifier.clickable {
                                             dropoffLocation = suggestion.displayName
                                             dropoffGeoPoint = GeoPoint(suggestion.latitude.toDouble(), suggestion.longitude.toDouble())
                                             dropoffSuggestions = emptyList()
+                                            isDropoffFocused = false
+                                            focusManager.clearFocus()
                                         }
                                     )
                                 }

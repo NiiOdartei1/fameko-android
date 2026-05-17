@@ -6,6 +6,7 @@
         android:name="android.hardware.camera"
         android:required="false" />
     <application
+        android:name=".DriverApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -39,6 +40,10 @@
                 <action android:name="com.example.famekodriver.OPEN_DASHBOARD" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.example.famekodriver.driver.OPEN_MAP" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -60,6 +65,12 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyB87GQft4tk7-ZdIQB7FpM12ZOjmRggOIY" />
+
+        <service
+            android:name=".LocationService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="location" />
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -70,12 +81,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <queries>
-        <package android:name="com.example.famekodriver.driver" />
-        <intent>
-            <action android:name="com.example.famekodriver.driver.OPEN_MAP" />
-        </intent>
     </queries>
 
 </manifest>

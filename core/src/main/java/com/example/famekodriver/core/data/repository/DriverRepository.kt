@@ -509,6 +509,7 @@ class DriverRepository {
             distanceKm = getDouble("distance_km"),
             estimatedEarnings = getDouble("estimated_earnings"),
             customerName = getString("customer_name"),
+            customerPhone = try { getString("customer_phone") } catch(_: Exception) { null },
             customerAddress = getString("customer_address")
         )
     }

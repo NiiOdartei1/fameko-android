@@ -1,4 +1,4 @@
-package com.example.famekodriver.driver
+package com.example.famekodriver
 
 import android.app.Application
 import org.osmdroid.config.Configuration

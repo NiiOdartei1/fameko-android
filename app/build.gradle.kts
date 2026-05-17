@@ -63,5 +63,5 @@ dependencies {
     implementation(libs.androidx.preference)
 
     // Cloudinary for fast uploads
-    implementation("com.cloudinary:cloudinary-android:3.0.2")
+    implementation(libs.cloudinary.android)
 }

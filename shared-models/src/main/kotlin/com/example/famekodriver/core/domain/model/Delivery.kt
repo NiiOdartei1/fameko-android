@@ -14,6 +14,7 @@ data class Delivery(
     val distanceKm: Double,
     val estimatedEarnings: Double,
     val customerName: String? = null,
+    val customerPhone: String? = null,
     val customerAddress: String? = null,
     val serviceType: String = "package_delivery",
     val createdAt: String? = null

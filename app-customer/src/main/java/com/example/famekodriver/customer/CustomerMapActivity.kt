@@ -348,13 +348,44 @@ fun CustomerMapScreen() {
                         enabled = !isLoading && currentOrderId == null
                     )
                     
-                    if (pickupSuggestions.isNotEmpty() && isPickupFocused) {
+                    if (isPickupFocused && currentOrderId == null) {
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                             elevation = CardDefaults.cardElevation(6.dp),
                             colors = CardDefaults.cardColors(containerColor = Color.White)
                         ) {
                             LazyColumn(modifier = Modifier.heightIn(max = 250.dp)) {
+                                item {
+                                    ListItem(
+                                        headlineContent = { Text("Use Current Location", fontWeight = FontWeight.Bold) },
+                                        supportingContent = { Text("Set your current position as pickup", fontSize = 11.sp, color = Color.Gray) },
+                                        leadingContent = { Icon(Icons.Default.MyLocation, null, tint = Color(0xFF34D186)) },
+                                        modifier = Modifier.clickable {
+                                            if (hasLocationPermission) {
+                                                val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+                                                @SuppressLint("MissingPermission")
+                                                fusedLocationClient.lastLocation.addOnSuccessListener { deviceLocation ->
+                                                    deviceLocation?.let { loc ->
+                                                        scope.launch {
+                                                            repository.reverseGeocode(loc.latitude, loc.longitude).onSuccess { suggestion ->
+                                                                pickupLocation = suggestion.displayName
+                                                                pickupGeoPoint = GeoPoint(loc.latitude, loc.longitude)
+                                                            }.onFailure {
+                                                                pickupLocation = "My Location"
+                                                                pickupGeoPoint = GeoPoint(loc.latitude, loc.longitude)
+                                                            }
+                                                            pickupSuggestions = emptyList()
+                                                            isPickupFocused = false
+                                                            focusManager.clearFocus()
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+                                            }
+                                        }
+                                    )
+                                }
                                 items(pickupSuggestions) { suggestion ->
                                     ListItem(
                                         headlineContent = { Text(suggestion.name ?: suggestion.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold) },

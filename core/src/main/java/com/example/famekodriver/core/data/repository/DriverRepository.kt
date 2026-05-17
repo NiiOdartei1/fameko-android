@@ -654,6 +654,19 @@ class DriverRepository {
         }
     }
 
+    suspend fun reverseGeocode(lat: Double, lng: Double): Result<LocationSuggestion> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.osmService.reverse(lat, lng)
+            Result.success(response.copy(
+                name = response.displayName.split(",")[0],
+                type = "address"
+            ))
+        } catch (e: Exception) {
+            android.util.Log.e("FamekoRepo", "Reverse geocode failed", e)
+            Result.failure(e)
+        }
+    }
+
     /**
      * Create a new order and delivery request in the database
      */

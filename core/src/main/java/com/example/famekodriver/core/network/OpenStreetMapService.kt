@@ -22,6 +22,15 @@ interface OpenStreetMapService {
         @Header("User-Agent") userAgent: String = "FamekoAndroidApp_Native_v1.0"
     ): List<LocationSuggestion>
 
+    // Direct call to Nominatim (Reverse Geocoding)
+    @GET("https://nominatim.openstreetmap.org/reverse")
+    suspend fun reverse(
+        @Query("lat") lat: Double,
+        @Query("lon") lon: Double,
+        @Query("format") format: String = "json",
+        @Header("User-Agent") userAgent: String = "FamekoAndroidApp_Native_v1.0"
+    ): LocationSuggestion
+
     // Direct call to OSRM (Road Routing)
     @GET
     suspend fun getRoute(@Url url: String): OsrmResponse

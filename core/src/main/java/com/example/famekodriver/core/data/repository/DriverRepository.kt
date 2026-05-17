@@ -32,11 +32,12 @@ class DriverRepository {
     suspend fun login(email: String, pass: String): Result<Driver?> = withContext(Dispatchers.IO) {
         try {
             val response = NetworkClient.famekoApi.loginDriver(LoginRequest(email, pass))
-            if (response.success && response.user_id != null) {
+            val userId = response.user_id
+            if (response.success && userId != null) {
                 // In a real app, we'd fetch the full driver object here
                 // For now, construct a minimal one from the auth response
                 Result.success(Driver(
-                    id = response.user_id.toInt(),
+                    id = userId.toInt(),
                     fullName = response.name ?: "Driver",
                     email = email,
                     phone = "",
@@ -257,56 +258,8 @@ class DriverRepository {
                 Result.failure(Exception(response.message ?: "Registration failed"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Driver API Registration failed, falling back to JDBC", e)
-            // Fallback to JDBC if API is not available
-            try {
-                ensureDriverLoaded()
-                DriverManager.getConnection(
-                    DatabaseConfig.getJdbcUrl(),
-                    DatabaseConfig.DB_USER,
-                    DatabaseConfig.DB_PASS,
-                ).use { connection ->
-                    connection.autoCommit = false
-                    try {
-                        val query = """
-                            INSERT INTO drivers (
-                                full_name, email, phone, password, license_number, 
-                                region, vehicle_type, service_types, vehicle_number, status
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING_DOCS') RETURNING id
-                        """.trimIndent()
-                        
-                        val driverId = connection.prepareStatement(query).use { stmt ->
-                            stmt.setString(1, name)
-                            stmt.setString(2, email)
-                            stmt.setString(3, phone)
-                            stmt.setString(4, password)
-                            stmt.setString(5, licenseNumber)
-                            stmt.setString(6, region)
-                            stmt.setString(7, vehicleType)
-                            stmt.setString(8, serviceType)
-                            stmt.setString(9, vehicleNumber)
-                            val rs = stmt.executeQuery()
-                            if (rs.next()) rs.getInt(1) else throw Exception("Failed to create driver record")
-                        }
-
-                        // 2. Initialize driver stats
-                        val statsQuery = "INSERT INTO driver_stats (driver_id, is_online, active_deliveries, completed_today, earnings_today, rating) VALUES (?, false, 0, 0, 0.0, 5.0)"
-                        connection.prepareStatement(statsQuery).use { stmt ->
-                            stmt.setString(1, driverId.toString())
-                            stmt.executeUpdate()
-                        }
-                        
-                        connection.commit()
-                        Result.success(Unit)
-                    } catch (dbEx: Exception) {
-                        connection.rollback()
-                        android.util.Log.e("FamekoRepo", "JDBC Fallback failed", dbEx)
-                        Result.failure(dbEx)
-                    }
-                }
-            } catch (e2: Exception) {
-                Result.failure(e2)
-            }
+            android.util.Log.e("FamekoRepo", "Driver API Registration failed", e)
+            Result.failure(Exception("Registration failed: ${e.localizedMessage}"))
         }
     }
 

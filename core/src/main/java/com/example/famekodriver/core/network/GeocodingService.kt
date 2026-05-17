@@ -36,6 +36,7 @@ interface FamekoApiService {
         @Body request: LoginRequest
     ): AuthResponse
 
+    @Multipart
     @POST("driver/register")
     suspend fun registerDriver(
         @Part("full_name") name: RequestBody,

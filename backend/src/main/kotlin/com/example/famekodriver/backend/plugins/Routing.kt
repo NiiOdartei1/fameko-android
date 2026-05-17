@@ -250,14 +250,15 @@ fun Application.configureRouting() {
 private fun registerCustomerInDb(req: CustomerRegisterRequest): Int? {
     var userId: Int? = null
     DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = "INSERT INTO customers (name, email, phone, password, default_address) VALUES (?, ?, ?, ?, ?) RETURNING id"
-        val stmt = conn.prepareStatement(sql)
+        val sql = "INSERT INTO customers (name, email, phone, password, default_address) VALUES (?, ?, ?, ?, ?)"
+        val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
         stmt.setString(1, req.name)
         stmt.setString(2, req.email)
         stmt.setString(3, req.phone)
         stmt.setString(4, req.password) // In real app, hash this
         stmt.setString(5, req.address)
-        val rs = stmt.executeQuery()
+        stmt.executeUpdate()
+        val rs = stmt.generatedKeys
         if (rs.next()) {
             userId = rs.getInt(1)
         }
@@ -301,10 +302,10 @@ private fun registerDriverInDb(data: Map<String, String>): Int? {
                 full_name, email, phone, region, password,
                 license_number, vehicle_type, vehicle_number, service_types,
                 profile_picture, license_image, id_front_image, id_back_image, vehicle_image, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """.trimIndent()
         
-        val stmt = conn.prepareStatement(sql)
+        val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
         stmt.setString(1, data["full_name"])
         stmt.setString(2, data["email"])
         stmt.setString(3, data["phone"])
@@ -324,7 +325,8 @@ private fun registerDriverInDb(data: Map<String, String>): Int? {
         val hasDocs = data.containsKey("profile_pic") || data.containsKey("drivers_license")
         stmt.setString(15, if (hasDocs) "PENDING" else "PENDING_DOCS")
         
-        val rs = stmt.executeQuery()
+        stmt.executeUpdate()
+        val rs = stmt.generatedKeys
         if (rs.next()) {
             driverId = rs.getInt(1)
         }

@@ -603,24 +603,22 @@ class DriverRepository {
 
     suspend fun getGeocodeSuggestions(query: String): Result<List<LocationSuggestion>> = withContext(Dispatchers.IO) {
         try {
-            // First try Backend API
-            val response = NetworkClient.famekoApi.getSuggestions(query)
-            if (response.isNotEmpty()) {
-                Result.success(response)
-            } else {
-                // Fallback to OSM directly if backend returns nothing
-                val osmResponse = NetworkClient.osmService.search(query)
-                Result.success(osmResponse)
+            // EXCLUSIVELY use OSM Nominatim directly to ensure real-world locations 
+            // and completely bypass any backend mocks (local or production)
+            val osmResponse = NetworkClient.osmService.search(query)
+            
+            // Map and filter results to ensure they are valid
+            val filteredResults = osmResponse.map { suggestion ->
+                suggestion.copy(
+                    name = suggestion.displayName.split(",")[0],
+                    type = "address"
+                )
             }
+            
+            Result.success(filteredResults)
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Geocode API failed, falling back to OSM", e)
-            try {
-                // Fallback to OSM directly on error
-                val osmResponse = NetworkClient.osmService.search(query)
-                Result.success(osmResponse)
-            } catch (e2: Exception) {
-                Result.failure(e2)
-            }
+            android.util.Log.e("FamekoRepo", "Direct OSM Geocode failed", e)
+            Result.failure(e)
         }
     }
 

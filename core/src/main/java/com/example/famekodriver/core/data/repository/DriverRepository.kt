@@ -268,8 +268,8 @@ class DriverRepository {
             android.util.Log.d("FamekoUpload", "Starting Cloudinary upload for driver $driverId, type: $docType")
             
             // 1. Upload to Cloudinary (Unsigned)
-            val cloudName = "dvzq5z6xp" // Replace with your Cloudinary Cloud Name
-            val uploadPreset = "fameko_docs" // Replace with your Unsigned Upload Preset
+            val cloudName = "df3jnubvy" 
+            val uploadPreset = "fameko_docs" // Ensure this is created as UNSIGNED in Cloudinary Dashboard
             
             val cloudinaryUrl = "https://api.cloudinary.com/v1_1/$cloudName/image/upload"
             

@@ -299,10 +299,10 @@
                 </div>
 
                 <div th:if="${driver['status'] != 'APPROVED'}" style="margin-top: 40px; display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 30px;">
-                    <form th:action="@{'/admin/approve/' + ${driver['id']}}" method="post">
+                    <form th:action="${'/admin/approve/' + driver['id']}" method="post">
                         <button type="submit" class="btn btn-approve"><i class="fas fa-check"></i> Approve Driver Account</button>
                     </form>
-                    <form th:action="@{'/admin/reject/' + ${driver['id']}}" method="post">
+                    <form th:action="${'/admin/reject/' + driver['id']}" method="post">
                         <button type="submit" class="btn btn-reject"><i class="fas fa-xmark"></i> Reject Account</button>
                     </form>
                 </div>

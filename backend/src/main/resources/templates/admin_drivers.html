@@ -162,14 +162,14 @@
                         </td>
                         <td>
                             <div th:if="${driver['status'] == 'PENDING'}" style="display:flex; gap:8px">
-                                <form th:action="@{'/admin/approve/' + ${driver['id']}}" method="post">
+                                <form th:action="${'/admin/approve/' + driver['id']}" method="post">
                                     <button type="submit" class="btn btn-approve">Approve</button>
                                 </form>
-                                <form th:action="@{'/admin/reject/' + ${driver['id']}}" method="post">
+                                <form th:action="${'/admin/reject/' + driver['id']}" method="post">
                                     <button type="submit" class="btn btn-reject">Reject</button>
                                 </form>
                             </div>
-                            <a th:unless="${driver['status'] == 'PENDING'}" th:href="@{'/admin/driver/' + ${driver['id']}}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">View Profile</a>
+                            <a th:unless="${driver['status'] == 'PENDING'}" th:href="${'/admin/driver/' + driver['id']}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">View Profile</a>
                         </td>
                     </tr>
                 </tbody>

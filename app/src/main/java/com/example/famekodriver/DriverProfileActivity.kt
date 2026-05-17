@@ -108,12 +108,16 @@ class DriverProfileActivity : AppCompatActivity() {
         val driverId = sessionManager.getDriverId() ?: return
         val file = uriToFile(uri) ?: return
 
+        val progressLayout = findViewById<View>(R.id.layoutProgress)
+        
         lifecycleScope.launch {
-            Toast.makeText(this@DriverProfileActivity, "Uploading...", Toast.LENGTH_SHORT).show()
+            progressLayout.visibility = View.VISIBLE
             repository.uploadDocument(driverId, type, file).onSuccess {
+                progressLayout.visibility = View.GONE
                 Toast.makeText(this@DriverProfileActivity, "Upload successful", Toast.LENGTH_SHORT).show()
                 refreshStatus()
             }.onFailure {
+                progressLayout.visibility = View.GONE
                 Toast.makeText(this@DriverProfileActivity, "Upload failed: ${it.message}", Toast.LENGTH_LONG).show()
             }
         }

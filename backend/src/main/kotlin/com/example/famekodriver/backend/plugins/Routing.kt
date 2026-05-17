@@ -208,7 +208,7 @@ fun Application.configureRouting() {
                         is PartData.FileItem -> {
                             fileName = part.originalFileName
                             fileBytes = part.streamProvider().readBytes()
-                            println("FILE RECEIVED: $fileName (${fileBytes?.size} bytes)")
+                            println("FILE RECEIVED: $fileName (${fileBytes.size} bytes)")
                         }
                         else -> {}
                     }
@@ -216,8 +216,19 @@ fun Application.configureRouting() {
                 }
 
                 if (driverId != null && docType != null && fileBytes != null) {
-                    println("SAVING DOCUMENT to DB for driver $driverId")
-                    updateDriverDocument(driverId!!, docType!!, fileName ?: "uploaded_file.jpg")
+                    println("SAVING DOCUMENT to disk and DB for driver $driverId")
+                    
+                    // Create uploads directory if not exists
+                    val uploadDir = java.io.File("uploads")
+                    if (!uploadDir.exists()) uploadDir.mkdirs()
+                    
+                    // Save actual file
+                    val safeFileName = "${driverId}_${docType}_${System.currentTimeMillis()}.jpg"
+                    val file = java.io.File(uploadDir, safeFileName)
+                    file.writeBytes(fileBytes)
+                    
+                    updateDriverDocument(driverId!!, docType!!, safeFileName)
+
                     call.respond(AuthResponse(true, "Document uploaded successfully", driverId, null))
                 } else {
                     val missing = mutableListOf<String>()

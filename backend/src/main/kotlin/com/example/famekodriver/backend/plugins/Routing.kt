@@ -49,6 +49,19 @@ fun Application.configureRouting() {
                 )))
             }
 
+            get("/driver/{id}") {
+                val id = call.parameters["id"]
+                val driver = if (id != null) getDriverById(id) else null
+                if (driver != null) {
+                    call.respond(ThymeleafContent("admin_driver_details", mapOf(
+                        "driver" to driver,
+                        "activePage" to "drivers"
+                    )))
+                } else {
+                    call.respondRedirect("/admin/drivers")
+                }
+            }
+
             get("/customers") {
                 val customers = getAllCustomers()
                 call.respond(ThymeleafContent("admin_customers", mapOf(
@@ -405,6 +418,29 @@ private fun getAllDrivers(): List<Map<String, Any>> {
         }
     }
     return drivers
+}
+
+private fun getDriverById(id: String): Map<String, Any>? {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "SELECT * FROM drivers WHERE id = ?"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, id.toInt())
+        val rs = stmt.executeQuery()
+        if (rs.next()) {
+            val meta = rs.metaData
+            val map = mutableMapOf<String, Any>()
+            for (i in 1..meta.columnCount) {
+                val name = meta.getColumnName(i).lowercase()
+                val value = rs.getObject(i)
+                if (value != null) map[name] = value
+            }
+            // Friendly aliases for templates
+            map["name"] = rs.getString("full_name")
+            map["vehicle"] = rs.getString("vehicle_type") ?: ""
+            return map
+        }
+    }
+    return null
 }
 
 private fun getAllDeliveries(): List<Map<String, Any>> {

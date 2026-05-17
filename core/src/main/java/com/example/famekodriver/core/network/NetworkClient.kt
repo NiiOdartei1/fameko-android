@@ -27,9 +27,10 @@ object NetworkClient {
 
     private val okHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(120, TimeUnit.SECONDS) // Give more time for image uploads
+            .connectTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(300, TimeUnit.SECONDS) // 5 minutes for large image uploads
+            .retryOnConnectionFailure(true)
             .build()
     }
 

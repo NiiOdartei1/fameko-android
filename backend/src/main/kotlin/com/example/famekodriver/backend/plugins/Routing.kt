@@ -379,14 +379,19 @@ private fun updateDriverDocument(id: String, docType: String, fileName: String) 
 
 private fun getDriverStatusFromDb(id: String): Map<String, Any> {
     DatabaseInitializer.getDataSource().connection.use { conn ->
-        conn.prepareStatement("SELECT status, profile_picture, license_image FROM drivers WHERE id = ?").use { stmt ->
+        val sql = "SELECT status, profile_picture, license_image, id_front_image, id_back_image, vehicle_image FROM drivers WHERE id = ?"
+        conn.prepareStatement(sql).use { stmt ->
             stmt.setInt(1, id.toInt())
             val rs = stmt.executeQuery()
             if (rs.next()) {
                 val status = rs.getString("status")
                 val missingDocs = mutableListOf<String>()
+                
                 if (rs.getString("profile_picture").isNullOrEmpty()) missingDocs.add("profile_pic")
                 if (rs.getString("license_image").isNullOrEmpty()) missingDocs.add("drivers_license")
+                if (rs.getString("id_front_image").isNullOrEmpty()) missingDocs.add("insurance_cert")
+                if (rs.getString("id_back_image").isNullOrEmpty()) missingDocs.add("roadworthy_cert")
+                if (rs.getString("vehicle_image").isNullOrEmpty()) missingDocs.add("ghana_card")
                 
                 return mapOf("success" to true, "status" to status, "missingDocs" to missingDocs)
             }

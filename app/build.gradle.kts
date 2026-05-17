@@ -54,6 +54,13 @@ dependencies {
     implementation(libs.google.material)
     implementation(libs.androidx.constraintlayout)
 
-    // For background location (optional, for driver tracking)
+    // Maps and Location (OSM / MapLibre)
+    implementation(libs.maplibre.android)
+    implementation(libs.osmdroid.android)
     implementation(libs.play.services.location)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.preference)
+
+    // Cloudinary for fast uploads
+    implementation("com.cloudinary:cloudinary-android:3.0.2")
 }

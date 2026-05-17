@@ -87,6 +87,23 @@ interface FamekoApiService {
     suspend fun getWalletTransactions(
         @Path("driverId") driverId: String
     ): List<Map<String, Any>>
+
+    @POST("safety/sos")
+    suspend fun triggerSOS(
+        @Body request: SOSRequest
+    ): AuthResponse
+
+    @GET("safety/share-trip/{driverId}/{deliveryId}")
+    suspend fun getShareableTripLink(
+        @Path("driverId") driverId: String,
+        @Path("deliveryId") deliveryId: String
+    ): ShareTripResponse
+
+    @GET("demand/heatmap")
+    suspend fun getHeatmapData(): List<HeatmapPoint>
+
+    @GET("demand/surge")
+    suspend fun getCurrentSurge(): SurgeInfo
 }
 
 data class DriverStatusResponse(

@@ -300,6 +300,17 @@ object DatabaseInitializer {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_by_admin_id INTEGER REFERENCES admins(id)
             )
+            """.trimIndent(),
+            """
+            CREATE TABLE IF NOT EXISTS sos_alerts (
+                id SERIAL PRIMARY KEY,
+                driver_id INTEGER REFERENCES drivers(id),
+                latitude DOUBLE PRECISION NOT NULL,
+                longitude DOUBLE PRECISION NOT NULL,
+                status TEXT DEFAULT 'ACTIVE',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP
+            )
             """.trimIndent()
         )
 

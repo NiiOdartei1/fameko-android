@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import android.widget.Toast
@@ -22,19 +21,28 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import com.example.famekodriver.core.domain.model.HeatmapPoint
+import com.example.famekodriver.core.domain.model.SurgeInfo
+import org.osmdroid.views.overlay.Polygon
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import java.util.Locale
 import com.example.famekodriver.core.data.SessionManager
 import com.example.famekodriver.core.data.repository.DriverRepository
@@ -104,6 +112,22 @@ fun MapScreen(
     var driverStatus by remember { mutableStateOf(sessionManager.getDriverStatus()) }
     var navigationPath by remember { mutableStateOf<List<GeoPoint>>(emptyList()) }
     var driverLatLng by remember { mutableStateOf<GeoPoint?>(null) }
+    var heatmapPoints by remember { mutableStateOf<List<HeatmapPoint>>(emptyList()) }
+    var currentSurge by remember { mutableStateOf<SurgeInfo?>(null) }
+
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            repository.getHeatmapData().onSuccess { points ->
+                heatmapPoints = points
+            }
+            repository.getCurrentSurge().onSuccess { surge ->
+                currentSurge = surge
+            }
+        } else {
+            heatmapPoints = emptyList()
+            currentSurge = null
+        }
+    }
 
     LaunchedEffect(isOnline, currentDelivery) {
         val intent = Intent(context, LocationService::class.java)
@@ -150,12 +174,11 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(hasLocationPermission, isOnline) {
+    LaunchedEffect(hasLocationPermission, isOnline, currentDelivery) {
         if (hasLocationPermission) {
             val driverId = sessionManager.getDriverId() ?: "DRIVER-1"
-            while (isActive) { // Use isActive for better coroutine handling
+            while (isActive) {
                 try {
-                    // Always track location if we have a current delivery, otherwise only if online
                     if (isOnline || currentDelivery != null) {
                         @SuppressLint("MissingPermission")
                         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
@@ -183,7 +206,6 @@ fun MapScreen(
                         }
                     }
 
-                    // Only poll for available deliveries if online and NOT on a trip and NO active request
                     if (isOnline && currentDelivery == null && activeRequest == null) {
                         repository.getAvailableDeliveries().onSuccess { deliveries ->
                             if (deliveries.isNotEmpty()) {
@@ -192,10 +214,12 @@ fun MapScreen(
                         }
                     }
                     
-                    delay(10000) 
+                    // Faster updates when on a delivery (3s) vs idle (10s)
+                    val pollInterval = if (currentDelivery != null) 3000L else 10000L
+                    delay(pollInterval) 
                 } catch (e: Exception) {
                     Log.e("MapScreen", "Error in background loop", e)
-                    delay(5000) // Avoid rapid retries on error
+                    delay(5000)
                 }
             }
         }
@@ -244,20 +268,47 @@ fun MapScreen(
             )
         },
         floatingActionButton = {
-            if (hasLocationPermission && activeRequest == null) {
-                FloatingActionButton(
-                    onClick = {
-                        @SuppressLint("MissingPermission")
-                        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-                            location?.let { loc ->
-                                mapView?.controller?.animateTo(GeoPoint(loc.latitude, loc.longitude), 15.0, 1000L)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.End) {
+                // SOS Button - Only show when Online or on a Delivery
+                if (isOnline || currentDelivery != null) {
+                    FloatingActionButton(
+                        onClick = {
+                            @SuppressLint("MissingPermission")
+                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                location?.let { loc ->
+                                    scope.launch {
+                                        val driverId = sessionManager.getDriverId() ?: "DRIVER-1"
+                                        repository.triggerSOS(driverId, loc.latitude, loc.longitude).onSuccess {
+                                            Toast.makeText(context, "SOS ALERT SENT! Help is on the way.", Toast.LENGTH_LONG).show()
+                                        }.onFailure {
+                                            Toast.makeText(context, "Failed to send SOS. Call emergency services!", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }
                             }
-                        }
-                    },
-                    containerColor = Color.White,
-                    contentColor = Color(0xFFFF6B35)
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "My Location")
+                        },
+                        containerColor = Color.Red,
+                        contentColor = Color.White
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = "SOS")
+                    }
+                }
+
+                if (hasLocationPermission && activeRequest == null) {
+                    FloatingActionButton(
+                        onClick = {
+                            @SuppressLint("MissingPermission")
+                            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                location?.let { loc ->
+                                    mapView?.controller?.animateTo(GeoPoint(loc.latitude, loc.longitude), 15.0, 1000L)
+                                }
+                            }
+                        },
+                        containerColor = Color.White,
+                        contentColor = Color(0xFFFF6B35)
+                    ) {
+                        Icon(Icons.Default.MyLocation, contentDescription = "My Location")
+                    }
                 }
             }
         }
@@ -283,6 +334,16 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 update = { mv ->
                     mv.overlays.removeAll { overlay -> overlay !is MyLocationNewOverlay }
+                    
+                    // Render Heatmap (Circles)
+                    heatmapPoints.forEach { point ->
+                        val circle = Polygon(mv)
+                        circle.points = Polygon.pointsAsCircle(GeoPoint(point.latitude, point.longitude), 300.0) // 300m radius
+                        circle.fillPaint.color = Color(1f, 0f, 0f, point.intensity.toFloat()).toArgb() // Red with intensity alpha
+                        circle.outlinePaint.strokeWidth = 0f
+                        mv.overlays.add(circle)
+                    }
+
                     if (navigationPath.isNotEmpty()) {
                         val line = Polyline(mv)
                         line.setPoints(navigationPath)
@@ -309,6 +370,30 @@ fun MapScreen(
                     RegistrationNotice(status = driverStatus, onGoToProfile = onNavigateToProfile)
                 }
 
+                currentSurge?.let { surge ->
+                    if (surge.isActive) {
+                        Surface(
+                            color = Color(0xFFFF6B35),
+                            shape = RoundedCornerShape(12.dp),
+                            shadowElevation = 4.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "${surge.multiplier}x Surge Active!",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Card(
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
@@ -327,6 +412,53 @@ fun MapScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("RATING", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
                             Text("${String.format(Locale.getDefault(), "%.1f", driverStats.rating)} ⭐", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFFFB400))
+                        }
+                    }
+                }
+
+                // In-App Navigation HUD
+                if (navigationPath.isNotEmpty() && currentDelivery != null) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFF004E89),
+                        contentColor = Color.White,
+                        shadowElevation = 8.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Navigation, null, modifier = Modifier.size(24.dp))
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (currentDelivery!!.status == DeliveryStatus.ASSIGNED) "Heading to Pickup" else "Heading to Drop-off",
+                                    fontSize = 11.sp,
+                                    color = Color.White.copy(alpha = 0.8f)
+                                )
+                                Text(
+                                    text = if (currentDelivery!!.status == DeliveryStatus.ASSIGNED) currentDelivery!!.pickupLocation else currentDelivery!!.dropoffLocation,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    maxLines = 1
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "${String.format(Locale.getDefault(), "%.1f", currentDelivery!!.distanceKm)} km",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 18.sp
+                                )
+                                Text("Remaining", fontSize = 10.sp, color = Color.White.copy(alpha = 0.7f))
+                            }
                         }
                     }
                 }
@@ -351,20 +483,20 @@ fun MapScreen(
                                 Text(delivery.customerName ?: "Customer", fontWeight = FontWeight.Bold, fontSize = 20.sp)
                             }
                             Row {
-                                IconButton(
-                                    onClick = {
-                                        val phone = delivery.customerPhone ?: ""
-                                        if (phone.isNotEmpty()) {
-                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
-                                            context.startActivity(intent)
-                                        } else {
-                                            Toast.makeText(context, "Phone number not available", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    modifier = Modifier.background(Color(0xFFF0F0F0), CircleShape)
-                                ) {
-                                    Icon(Icons.Default.Call, "Call Customer", tint = Color(0xFF28A745))
-                                }
+                                    IconButton(
+                                        onClick = {
+                                            val phone = delivery.customerPhone ?: ""
+                                            if (phone.isNotEmpty()) {
+                                                val intent = Intent(Intent.ACTION_DIAL, "tel:$phone".toUri())
+                                                context.startActivity(intent)
+                                            } else {
+                                                Toast.makeText(context, "Phone number not available", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier.background(Color(0xFFF0F0F0), CircleShape)
+                                    ) {
+                                        Icon(Icons.Default.Call, "Call Customer", tint = Color(0xFF28A745))
+                                    }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 IconButton(
                                     onClick = {
@@ -377,22 +509,40 @@ fun MapScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 IconButton(
                                     onClick = {
-                                        val lat = if (delivery.status == DeliveryStatus.ASSIGNED) delivery.pickupLat else delivery.dropoffLat
-                                        val lng = if (delivery.status == DeliveryStatus.ASSIGNED) delivery.pickupLng else delivery.dropoffLng
-                                        val gmmIntentUri = Uri.parse("google.navigation:q=$lat,$lng")
-                                        val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
-                                        mapIntent.setPackage("com.google.android.apps.maps")
-                                        if (mapIntent.resolveActivity(context.packageManager) != null) {
-                                            context.startActivity(mapIntent)
-                                        } else {
-                                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng"))
-                                            context.startActivity(webIntent)
+                                        val driverId = sessionManager.getDriverId() ?: ""
+                                        scope.launch {
+                                            repository.getShareableTripLink(driverId, delivery.id).onSuccess { response ->
+                                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                                    type = "text/plain"
+                                                    putExtra(Intent.EXTRA_TEXT, "Track my Fameko delivery: ${response.shareUrl}")
+                                                }
+                                                context.startActivity(Intent.createChooser(intent, "Share Trip"))
+                                            }
                                         }
                                     },
                                     modifier = Modifier.background(Color(0xFFF0F0F0), CircleShape)
                                 ) {
-                                    Icon(Icons.Default.Navigation, "Navigate", tint = Color(0xFF004E89))
+                                    Icon(Icons.Default.Share, "Share Trip", tint = Color(0xFF004E89))
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                    IconButton(
+                                        onClick = {
+                                            val lat = if (delivery.status == DeliveryStatus.ASSIGNED) delivery.pickupLat else delivery.dropoffLat
+                                            val lng = if (delivery.status == DeliveryStatus.ASSIGNED) delivery.pickupLng else delivery.dropoffLng
+                                            val gmmIntentUri = "google.navigation:q=$lat,$lng".toUri()
+                                            val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
+                                            mapIntent.setPackage("com.google.android.apps.maps")
+                                            if (mapIntent.resolveActivity(context.packageManager) != null) {
+                                                context.startActivity(mapIntent)
+                                            } else {
+                                                val webIntent = Intent(Intent.ACTION_VIEW, "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng".toUri())
+                                                context.startActivity(webIntent)
+                                            }
+                                        },
+                                        modifier = Modifier.background(Color(0xFFF0F0F0), CircleShape)
+                                    ) {
+                                        Icon(Icons.Default.Navigation, "Navigate", tint = Color(0xFF004E89))
+                                    }
                             }
                         }
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF0F0F0))

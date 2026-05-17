@@ -300,6 +300,86 @@ fun Application.configureRouting() {
             )
             call.respond(response)
         }
+
+        route("/safety") {
+            post("/sos") {
+                val req = call.receive<SOSRequest>()
+                saveSOSAlert(req)
+                // In a production app, trigger real-time alerts to dispatchers here
+                call.respond(AuthResponse(true, "SOS Alert received. Help is on the way.", req.driverId, null))
+            }
+
+            get("/share-trip/{driverId}/{deliveryId}") {
+                val driverId = call.parameters["driverId"]
+                val deliveryId = call.parameters["deliveryId"]
+                // In a real app, generate a unique tracking token and store it
+                val shareUrl = "https://fameko-tracking.web.app/trip/$deliveryId"
+                call.respond(ShareTripResponse(shareUrl, deliveryId ?: "", System.currentTimeMillis() + 3600000))
+            }
+        }
+
+        route("/demand") {
+            get("/heatmap") {
+                // In a real app, query the DB for recent orders pickup locations
+                val heatmap = listOf(
+                    HeatmapPoint(5.6177, -0.1733, 0.9), // Accra Mall
+                    HeatmapPoint(5.5500, -0.1900, 0.7), // James Town
+                    HeatmapPoint(5.6000, -0.2200, 0.5), // Kaneshie
+                    HeatmapPoint(5.6500, -0.1800, 0.8)  // Legon
+                )
+                call.respond(heatmap)
+            }
+
+            get("/surge") {
+                val surge = calculateCurrentSurge()
+                call.respond(surge)
+            }
+        }
+    }
+}
+
+private fun calculateCurrentSurge(): SurgeInfo {
+    return try {
+        DatabaseInitializer.getDataSource().connection.use { conn ->
+            // Count pending deliveries
+            val pendingOrders = conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery("SELECT COUNT(*) FROM deliveries WHERE status = 'PENDING'")
+                if (rs.next()) rs.getInt(1) else 0
+            }
+
+            // Count online drivers
+            val onlineDrivers = conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery("SELECT COUNT(*) FROM drivers WHERE is_online = true")
+                if (rs.next()) rs.getInt(1) else 0
+            }
+
+            // Simple Logic: If pending orders > online drivers, trigger surge
+            val multiplier = when {
+                onlineDrivers == 0 && pendingOrders > 0 -> 2.0
+                pendingOrders > onlineDrivers * 2 -> 1.8
+                pendingOrders > onlineDrivers -> 1.4
+                else -> 1.0
+            }
+
+            SurgeInfo(
+                multiplier = multiplier,
+                isActive = multiplier > 1.0,
+                reason = if (multiplier > 1.0) "High Demand in your area" else null
+            )
+        }
+    } catch (e: Exception) {
+        SurgeInfo(1.0, false, null)
+    }
+}
+
+private fun saveSOSAlert(req: SOSRequest) {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "INSERT INTO sos_alerts (driver_id, latitude, longitude) VALUES (?, ?, ?)"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, req.driverId.toInt())
+        stmt.setDouble(2, req.latitude)
+        stmt.setDouble(3, req.longitude)
+        stmt.executeUpdate()
     }
 }
 

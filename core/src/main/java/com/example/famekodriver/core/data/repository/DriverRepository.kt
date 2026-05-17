@@ -489,6 +489,47 @@ class DriverRepository {
         }
     }
 
+    suspend fun triggerSOS(driverId: String, lat: Double, lng: Double): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val request = SOSRequest(driverId, lat, lng)
+            val response = NetworkClient.famekoApi.triggerSOS(request)
+            if (response.success) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.message ?: "Failed to trigger SOS"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getShareableTripLink(driverId: String, deliveryId: String): Result<ShareTripResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getShareableTripLink(driverId, deliveryId)
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getHeatmapData(): Result<List<HeatmapPoint>> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getHeatmapData()
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getCurrentSurge(): Result<SurgeInfo> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getCurrentSurge()
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /**
      * Create a new order and delivery request in the database
      */

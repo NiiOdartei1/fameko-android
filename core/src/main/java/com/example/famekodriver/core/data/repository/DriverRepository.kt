@@ -499,10 +499,42 @@ class DriverRepository {
 
     suspend fun calculateRoute(request: RouteRequest): Result<RouteResponse> = withContext(Dispatchers.IO) {
         try {
-            val response = NetworkClient.routingApi.calculateRoute(request)
-            Result.success(response)
-        } catch (_: Exception) {
-            Result.failure(Exception("Failed to calculate route"))
+            // EXCLUSIVELY use OSRM directly for real-world road routing
+            // and completely bypass any backend mock routing logic
+            val url = "https://router.project-osrm.org/route/v1/driving/" +
+                    "${request.start.lng},${request.start.lat};" +
+                    "${request.end.lng},${request.end.lat}" +
+                    "?overview=full&geometries=geojson"
+            
+            val osrmResponse = NetworkClient.osmService.getRoute(url)
+            
+            if (osrmResponse.code == "Ok" && osrmResponse.routes.isNotEmpty()) {
+                val route = osrmResponse.routes[0]
+                val response = RouteResponse(
+                    fromCache = false,
+                    routeCoords = route.geometry.coordinates,
+                    distanceM = route.distance.toInt(),
+                    etaMin = route.duration / 60.0,
+                    vehicleType = request.vehicleType,
+                    routeType = request.routeType,
+                    waypoints = route.geometry.coordinates.size,
+                    computedAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date())
+                )
+                Result.success(response)
+            } else {
+                Result.failure(Exception("No valid route found from OSRM: ${osrmResponse.code}"))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("FamekoRepo", "Direct OSRM Routing failed, falling back to backend", e)
+            try {
+                // Fallback to backend as a last resort
+                val response = NetworkClient.routingApi.calculateRoute(request)
+                Result.success(response)
+            } catch (e2: Exception) {
+                Result.failure(Exception("Routing failed: ${e2.localizedMessage}"))
+            }
         }
     }
 

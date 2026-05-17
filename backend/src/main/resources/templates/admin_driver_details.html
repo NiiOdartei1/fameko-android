@@ -130,6 +130,7 @@
         .status-PENDING { background: #fff9db; color: #f08c00; }
         .status-APPROVED { background: #ebfbee; color: #2b8a3e; }
         .status-REJECTED { background: #fff5f5; color: #c92a2a; }
+        .status-SUSPENDED { background: #fff4e6; color: #d9480f; }
 
         .doc-grid {
             display: grid;
@@ -179,6 +180,7 @@
 
         .btn-approve { background-color: var(--secondary-color); color: white; }
         .btn-reject { background-color: var(--danger-color); color: white; }
+        .btn-suspend { background-color: var(--warning-color); color: var(--dark-text); }
         .btn-back { background-color: #f1f3f5; color: #495057; text-decoration: none; display: inline-block; }
 
         .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -298,13 +300,37 @@
                     </div>
                 </div>
 
-                <div th:if="${driver['status'] != 'APPROVED'}" style="margin-top: 40px; display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 30px;">
-                    <form th:action="${'/admin/approve/' + driver['id']}" method="post">
-                        <button type="submit" class="btn btn-approve"><i class="fas fa-check"></i> Approve Driver Account</button>
-                    </form>
-                    <form th:action="${'/admin/reject/' + driver['id']}" method="post">
-                        <button type="submit" class="btn btn-reject"><i class="fas fa-xmark"></i> Reject Account</button>
-                    </form>
+                <div style="margin-top: 40px; display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 30px;">
+                    <!-- Pending Flow -->
+                    <div th:if="${driver['status'] == 'PENDING'}" style="display: flex; gap: 15px;">
+                        <form th:action="${'/admin/approve/' + driver['id']}" method="post">
+                            <button type="submit" class="btn btn-approve"><i class="fas fa-check"></i> Approve Driver Account</button>
+                        </form>
+                        <form th:action="${'/admin/reject/' + driver['id']}" method="post">
+                            <button type="submit" class="btn btn-reject"><i class="fas fa-xmark"></i> Reject Account</button>
+                        </form>
+                    </div>
+
+                    <!-- Approved Flow -->
+                    <div th:if="${driver['status'] == 'APPROVED'}" style="display: flex; gap: 15px;">
+                        <form th:action="${'/admin/suspend/' + driver['id']}" method="post">
+                            <button type="submit" class="btn btn-suspend"><i class="fas fa-pause"></i> Suspend Driver</button>
+                        </form>
+                    </div>
+
+                    <!-- Suspended Flow -->
+                    <div th:if="${driver['status'] == 'SUSPENDED'}" style="display: flex; gap: 15px;">
+                        <form th:action="${'/admin/release/' + driver['id']}" method="post">
+                            <button type="submit" class="btn btn-approve"><i class="fas fa-play"></i> Release/Re-activate Driver</button>
+                        </form>
+                    </div>
+
+                    <!-- Rejected Flow -->
+                    <div th:if="${driver['status'] == 'REJECTED'}" style="display: flex; gap: 15px;">
+                        <form th:action="${'/admin/approve/' + driver['id']}" method="post">
+                            <button type="submit" class="btn btn-approve"><i class="fas fa-rotate-left"></i> Re-consider and Approve</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

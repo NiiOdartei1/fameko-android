@@ -109,6 +109,7 @@
         .status-PENDING { background: #fff9db; color: #f08c00; }
         .status-APPROVED { background: #ebfbee; color: #2b8a3e; }
         .status-REJECTED { background: #fff5f5; color: #c92a2a; }
+        .status-SUSPENDED { background: #fff4e6; color: #d9480f; }
 
         .btn { padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 700; font-size: 0.8rem; }
         .btn-approve { background-color: var(--secondary-color); color: white; }
@@ -161,15 +162,33 @@
                             <span th:class="${'status-badge status-' + driver['status']}" th:text="${driver['status']}">PENDING</span>
                         </td>
                         <td>
-                            <div th:if="${driver['status'] == 'PENDING'}" style="display:flex; gap:8px">
-                                <form th:action="${'/admin/approve/' + driver['id']}" method="post">
-                                    <button type="submit" class="btn btn-approve">Approve</button>
-                                </form>
-                                <form th:action="${'/admin/reject/' + driver['id']}" method="post">
-                                    <button type="submit" class="btn btn-reject">Reject</button>
-                                </form>
+                            <div style="display:flex; gap:8px">
+                                <!-- Pending -->
+                                <th:block th:if="${driver['status'] == 'PENDING'}">
+                                    <form th:action="${'/admin/approve/' + driver['id']}" method="post">
+                                        <button type="submit" class="btn btn-approve">Approve</button>
+                                    </form>
+                                    <form th:action="${'/admin/reject/' + driver['id']}" method="post">
+                                        <button type="submit" class="btn btn-reject">Reject</button>
+                                    </form>
+                                </th:block>
+
+                                <!-- Approved -->
+                                <th:block th:if="${driver['status'] == 'APPROVED'}">
+                                    <form th:action="${'/admin/suspend/' + driver['id']}" method="post">
+                                        <button type="submit" class="btn btn-reject" style="background: #fff5f5;">Suspend</button>
+                                    </form>
+                                </th:block>
+
+                                <!-- Suspended -->
+                                <th:block th:if="${driver['status'] == 'SUSPENDED'}">
+                                    <form th:action="${'/admin/release/' + driver['id']}" method="post">
+                                        <button type="submit" class="btn btn-approve">Release</button>
+                                    </form>
+                                </th:block>
+
+                                <a th:href="${'/admin/driver/' + driver['id']}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">View Profile</a>
                             </div>
-                            <a th:unless="${driver['status'] == 'PENDING'}" th:href="${'/admin/driver/' + driver['id']}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">View Profile</a>
                         </td>
                     </tr>
                 </tbody>

@@ -33,8 +33,13 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="false"
-            android:theme="@style/Theme.FamekoDriver" />
+            android:exported="true"
+            android:theme="@style/Theme.FamekoDriver">
+            <intent-filter>
+                <action android:name="com.example.famekodriver.OPEN_DASHBOARD" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".DriverProfileActivity"
@@ -65,5 +70,12 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <queries>
+        <package android:name="com.example.famekodriver.driver" />
+        <intent>
+            <action android:name="com.example.famekodriver.driver.OPEN_MAP" />
+        </intent>
+    </queries>
 
 </manifest>

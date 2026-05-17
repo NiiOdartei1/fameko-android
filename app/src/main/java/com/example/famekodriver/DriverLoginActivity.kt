@@ -23,8 +23,17 @@ class DriverLoginActivity : AppCompatActivity() {
         // Check if already logged in
         if (sessionManager.isLoggedIn()) {
             Toast.makeText(this, "Welcome back, ${sessionManager.getDriverName()}", Toast.LENGTH_SHORT).show()
-            // In the 'app' module, we don't have the MapScreen directly accessible easily
-            // You should ideally run the 'app-driver' module for the full experience
+            
+            if (sessionManager.getDriverStatus() == "APPROVED") {
+                if (navigateToMap()) {
+                    finish()
+                    return
+                }
+            }
+
+            val intent = Intent(this, MainActivity::class.java)
+            startActivity(intent)
+            finish()
         }
 
         setContentView(R.layout.activity_driver_login)
@@ -52,8 +61,18 @@ class DriverLoginActivity : AppCompatActivity() {
                         if (driver != null) {
                             sessionManager.saveSession(driver.id.toString(), driver.fullName, driver.status)
                             Toast.makeText(this@DriverLoginActivity, "Login Successful!", Toast.LENGTH_SHORT).show()
-                            val intent = Intent(this@DriverLoginActivity, MainActivity::class.java)
-                            startActivity(intent)
+                            
+                            if (driver.status == "APPROVED") {
+                                // Direct to Map if already approved
+                                if (!navigateToMap()) {
+                                    val intent = Intent(this@DriverLoginActivity, MainActivity::class.java)
+                                    startActivity(intent)
+                                }
+                            } else {
+                                // Go to dashboard/status screen
+                                val intent = Intent(this@DriverLoginActivity, MainActivity::class.java)
+                                startActivity(intent)
+                            }
                             finish()
                         } else {
                             btnLogin.isEnabled = true
@@ -71,6 +90,21 @@ class DriverLoginActivity : AppCompatActivity() {
         tvRegister.setOnClickListener {
             val intent = Intent(this, DriverSignupActivity::class.java)
             startActivity(intent)
+        }
+    }
+
+    private fun navigateToMap(): Boolean {
+        return try {
+            android.util.Log.d("FamekoNav", "Login: Attempting to navigate to Map...")
+            val intent = Intent("com.example.famekodriver.driver.OPEN_MAP")
+            intent.setClassName("com.example.famekodriver.driver", "com.example.famekodriver.driver.MainActivity")
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            startActivity(intent)
+            android.util.Log.d("FamekoNav", "Login: Navigation intent sent successfully")
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("FamekoNav", "Login: Navigation failed: ${e.message}", e)
+            false
         }
     }
 }

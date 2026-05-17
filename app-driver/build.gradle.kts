@@ -61,4 +61,7 @@ dependencies {
     implementation(libs.maplibre.android)
     implementation(libs.osmdroid.android)
     implementation(libs.play.services.location)
+
+    // Cloudinary for fast uploads
+    implementation("com.cloudinary:cloudinary-android:3.0.2")
 }

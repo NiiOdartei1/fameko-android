@@ -106,6 +106,22 @@ fun Application.configureRouting() {
                 }
                 call.respondRedirect("/admin/dashboard")
             }
+
+            post("/suspend/{id}") {
+                val id = call.parameters["id"]
+                if (id != null) {
+                    updateDriverStatus(id, "SUSPENDED")
+                }
+                call.respondRedirect("/admin/driver/$id")
+            }
+
+            post("/release/{id}") {
+                val id = call.parameters["id"]
+                if (id != null) {
+                    updateDriverStatus(id, "APPROVED")
+                }
+                call.respondRedirect("/admin/driver/$id")
+            }
         }
 
         // Native API for mobile apps (matching Retrofit paths)

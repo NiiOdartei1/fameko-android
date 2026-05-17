@@ -65,28 +65,24 @@ object DatabaseInitializer {
 
     private fun seedAdmin(conn: Connection) {
         try {
-            val isPostgres = conn.metaData.databaseProductName.contains("PostgreSQL", ignoreCase = true)
+            // Check if admin already exists to avoid duplicates without relying on ON CONFLICT
+            val sqlCheckAdmin = "SELECT COUNT(*) FROM admins WHERE username = 'admin'"
+            val adminExists = conn.createStatement().use { it.executeQuery(sqlCheckAdmin).use { rs -> if (rs.next()) rs.getInt(1) > 0 else false } }
             
-            if (isPostgres) {
-                val sqlAdmin = "INSERT INTO admins (username, email, password, can_manage_drivers, is_active) VALUES ('admin', 'niiodartei24@gmail.com', 'feroA5002', true, true) ON CONFLICT (username) DO NOTHING"
-                val sqlDriver = "INSERT INTO drivers (full_name, email, phone, region, password, license_number, status, vehicle_type) VALUES ('Test Driver', 'driver@test.com', '0240000000', 'Ashanti', 'pass123', 'DL-12345', 'PENDING', 'Car') ON CONFLICT (email) DO NOTHING"
-                conn.createStatement().use { 
-                    it.execute(sqlAdmin)
-                    it.execute(sqlDriver)
-                }
-            } else {
-                // H2 Standalone mode seeding
-                val sqlCheckAdmin = "SELECT COUNT(*) FROM admins WHERE username = 'admin'"
-                val count = conn.createStatement().use { it.executeQuery(sqlCheckAdmin).use { rs -> if (rs.next()) rs.getInt(1) else 0 } }
-                
-                if (count == 0) {
-                    val sqlAdmin = "INSERT INTO admins (username, email, password, can_manage_drivers, is_active) VALUES ('admin', 'niiodartei24@gmail.com', 'feroA5002', true, true)"
-                    val sqlDriver = "INSERT INTO drivers (full_name, email, phone, region, password, license_number, status, vehicle_type) VALUES ('Test Driver', 'driver@test.com', '0240000000', 'Ashanti', 'pass123', 'DL-12345', 'PENDING', 'Car')"
-                    conn.createStatement().use { 
-                        it.execute(sqlAdmin)
-                        it.execute(sqlDriver)
-                    }
-                }
+            if (!adminExists) {
+                val sqlAdmin = "INSERT INTO admins (username, email, password, can_manage_drivers, is_active) VALUES ('admin', 'niiodartei24@gmail.com', 'feroA5002', true, true)"
+                conn.createStatement().use { it.execute(sqlAdmin) }
+                println("Admin seeded successfully.")
+            }
+
+            // Check if test driver already exists
+            val sqlCheckDriver = "SELECT COUNT(*) FROM drivers WHERE email = 'driver@test.com'"
+            val driverExists = conn.createStatement().use { it.executeQuery(sqlCheckDriver).use { rs -> if (rs.next()) rs.getInt(1) > 0 else false } }
+
+            if (!driverExists) {
+                val sqlDriver = "INSERT INTO drivers (full_name, email, phone, region, password, license_number, status, vehicle_type) VALUES ('Test Driver', 'driver@test.com', '0240000000', 'Ashanti', 'pass123', 'DL-12345', 'PENDING', 'Car')"
+                conn.createStatement().use { it.execute(sqlDriver) }
+                println("Test Driver seeded successfully.")
             }
         } catch (e: Exception) {
             println("Seeding failed: ${e.message}")

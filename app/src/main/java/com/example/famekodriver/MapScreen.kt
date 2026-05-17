@@ -16,8 +16,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.*
@@ -38,6 +40,7 @@ import com.example.famekodriver.core.data.SessionManager
 import com.example.famekodriver.core.data.repository.DriverRepository
 import com.example.famekodriver.core.domain.model.Delivery
 import com.example.famekodriver.core.domain.model.DeliveryStatus
+import com.example.famekodriver.core.domain.model.FamekoEvent
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import androidx.compose.ui.viewinterop.AndroidView
@@ -59,6 +62,8 @@ import com.example.famekodriver.core.domain.model.RouteRequest
 @Composable
 fun MapScreen(
     onNavigateToProfile: () -> Unit,
+    onNavigateToWallet: () -> Unit,
+    onNavigateToChat: (Int, String) -> Unit,
     onLogout: () -> Unit
 ) {
     val context = LocalContext.current
@@ -113,6 +118,31 @@ fun MapScreen(
         } else {
             intent.action = LocationService.ACTION_STOP
             context.stopService(intent)
+        }
+    }
+
+    LaunchedEffect(isOnline) {
+        val driverId = sessionManager.getDriverId() ?: return@LaunchedEffect
+        if (isOnline) {
+            repository.startWebSocket(driverId)
+        } else {
+            repository.stopWebSocket()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        repository.events.collect { event ->
+            when (event) {
+                is FamekoEvent.NewDeliveryRequest -> {
+                    if (currentDelivery == null) {
+                        activeRequest = event.delivery
+                    }
+                }
+                is FamekoEvent.NewMessage -> {
+                    // Show notification or update chat UI
+                }
+                else -> {}
+            }
         }
     }
 
@@ -194,6 +224,9 @@ fun MapScreen(
             TopAppBar(
                 title = { Text("Delivery Map") },
                 actions = {
+                    IconButton(onClick = onNavigateToWallet) {
+                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Wallet")
+                    }
                     IconButton(onClick = onNavigateToProfile) {
                         Icon(Icons.Default.Person, contentDescription = "Profile")
                     }
@@ -325,6 +358,15 @@ fun MapScreen(
                                     modifier = Modifier.background(Color(0xFFF0F0F0), CircleShape)
                                 ) {
                                     Icon(Icons.Default.Call, "Call Customer", tint = Color(0xFF28A745))
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = {
+                                        onNavigateToChat(delivery.orderId, delivery.customerName ?: "Customer")
+                                    },
+                                    modifier = Modifier.background(Color(0xFFF0F0F0), CircleShape)
+                                ) {
+                                    Icon(Icons.AutoMirrored.Filled.Chat, "Chat", tint = Color(0xFF004E89))
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 IconButton(

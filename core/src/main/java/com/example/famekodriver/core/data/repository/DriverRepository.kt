@@ -4,19 +4,68 @@ import com.example.famekodriver.core.domain.model.*
 import com.example.famekodriver.core.network.DatabaseConfig
 import com.example.famekodriver.core.network.NetworkClient
 import com.example.famekodriver.core.network.DriverStatusResponse
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.sql.DriverManager
 import java.sql.ResultSet
+import com.google.gson.Gson
 
 /**
  * Repository for driver-related database operations.
  */
 class DriverRepository {
+    private val gson = Gson()
+    private val _events = MutableSharedFlow<FamekoEvent>(extraBufferCapacity = 10)
+    val events: SharedFlow<FamekoEvent> = _events
+
+    private var webSocket: WebSocket? = null
+
+    fun startWebSocket(userId: String) {
+        val request = Request.Builder()
+            .url(NetworkClient.getWebSocketUrl(userId))
+            .build()
+        
+        webSocket = NetworkClient.okHttpClient.newWebSocket(request, object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                try {
+                    val wsMessage = gson.fromJson(text, WebSocketMessage::class.java)
+                    when (wsMessage.type) {
+                        "NEW_DELIVERY" -> {
+                            val delivery = gson.fromJson(wsMessage.payload, Delivery::class.java)
+                            _events.tryEmit(FamekoEvent.NewDeliveryRequest(delivery))
+                        }
+                        "STATUS_CHANGED" -> {
+                            // Handle status changes
+                        }
+                        "NEW_MESSAGE" -> {
+                            val message = gson.fromJson(wsMessage.payload, Message::class.java)
+                            _events.tryEmit(FamekoEvent.NewMessage(message))
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                webSocket.close(1000, null)
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                // Reconnect logic could go here
+            }
+        })
+    }
+
+    fun stopWebSocket() {
+        webSocket?.close(1000, "User logged out")
+        webSocket = null
+    }
 
     private fun ensureDriverLoaded() {
         try {
@@ -401,6 +450,42 @@ class DriverRepository {
             Result.success(response)
         } catch (_: Exception) {
             Result.failure(Exception("Failed to calculate route"))
+        }
+    }
+
+    suspend fun sendMessage(message: Message): Result<Message> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.sendMessage(message)
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getChatHistory(convId: Int): Result<List<Message>> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getChatHistory(convId)
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getWalletBalance(driverId: String): Result<Double> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getWalletBalance(driverId)
+            Result.success(response["balance"] ?: 0.0)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getWalletTransactions(driverId: String): Result<List<Map<String, Any>>> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.getWalletTransactions(driverId)
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 

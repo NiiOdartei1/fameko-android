@@ -245,6 +245,40 @@ fun Application.configureRouting() {
             call.respond(statusData)
         }
 
+        route("/chat") {
+            post("/send") {
+                val message = call.receive<Message>()
+                val id = saveMessage(message)
+                if (id != null) {
+                    val savedMessage = message.copy(id = id)
+                    // Broadcast to recipient
+                    val recipientId = if (message.senderType == "driver") "cust_${message.conversationId}" else "driver_${message.conversationId}" 
+                    sendToUser(recipientId, "NEW_MESSAGE", savedMessage)
+                    call.respond(savedMessage)
+                } else {
+                    call.respond(io.ktor.http.HttpStatusCode.InternalServerError)
+                }
+            }
+
+            get("/history/{convId}") {
+                val convId = call.parameters["convId"]?.toIntOrNull() ?: return@get call.respond(emptyList<Message>())
+                call.respond(getMessageHistory(convId))
+            }
+        }
+
+        route("/wallet") {
+            get("/balance/{driverId}") {
+                val driverId = call.parameters["driverId"]?.toIntOrNull() ?: return@get call.respond(AuthResponse(false, "Invalid ID", null, null))
+                val balance = getWalletBalance(driverId)
+                call.respond(mapOf("balance" to balance))
+            }
+
+            get("/transactions/{driverId}") {
+                val driverId = call.parameters["driverId"]?.toIntOrNull() ?: return@get call.respond(emptyList<Map<String, Any>>())
+                call.respond(getWalletTransactions(driverId))
+            }
+        }
+
         post("/route/calculate") {
             val request = call.receive<RouteRequest>()
             // Native straight-line routing simulation
@@ -267,6 +301,76 @@ fun Application.configureRouting() {
             call.respond(response)
         }
     }
+}
+
+private fun saveMessage(msg: Message): Int? {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "INSERT INTO messages (conversation_id, sender_type, sender_id, body) VALUES (?, ?, ?, ?)"
+        val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
+        stmt.setInt(1, msg.conversationId)
+        stmt.setString(2, msg.senderType)
+        stmt.setInt(3, msg.senderId)
+        stmt.setString(4, msg.body)
+        stmt.executeUpdate()
+        val rs = stmt.generatedKeys
+        return if (rs.next()) rs.getInt(1) else null
+    }
+}
+
+private fun getMessageHistory(convId: Int): List<Message> {
+    val messages = mutableListOf<Message>()
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, convId)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            messages.add(Message(
+                id = rs.getInt("id"),
+                conversationId = rs.getInt("conversation_id"),
+                senderType = rs.getString("sender_type"),
+                senderId = rs.getInt("sender_id"),
+                body = rs.getString("body"),
+                createdAt = rs.getTimestamp("created_at").toString(),
+                read = rs.getBoolean("read")
+            ))
+        }
+    }
+    return messages
+}
+
+private fun getWalletBalance(driverId: Int): Double {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "SELECT balance FROM wallets WHERE driver_id = ?"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, driverId)
+        val rs = stmt.executeQuery()
+        return if (rs.next()) rs.getDouble("balance") else 0.0
+    }
+}
+
+private fun getWalletTransactions(driverId: Int): List<Map<String, Any>> {
+    val txs = mutableListOf<Map<String, Any>>()
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = """
+            SELECT t.* FROM wallet_transactions t
+            JOIN wallets w ON t.wallet_id = w.id
+            WHERE w.driver_id = ? ORDER BY t.created_at DESC
+        """.trimIndent()
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, driverId)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            txs.add(mapOf(
+                "id" to rs.getInt("id"),
+                "amount" to rs.getDouble("amount"),
+                "type" to rs.getString("transaction_type"),
+                "description" to (rs.getString("description") ?: ""),
+                "date" to rs.getTimestamp("created_at").toString()
+            ))
+        }
+    }
+    return txs
 }
 
 // Database implementation functions

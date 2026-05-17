@@ -19,6 +19,12 @@ import com.example.famekodriver.core.data.repository.DriverRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+sealed class Screen {
+    object Map : Screen()
+    object Wallet : Screen()
+    data class Chat(val conversationId: Int, val customerName: String) : Screen()
+}
+
 class MainActivity : ComponentActivity() {
     private val repository = DriverRepository()
     private lateinit var sessionManager: SessionManager
@@ -31,6 +37,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var currentStatus by remember { mutableStateOf(sessionManager.getDriverStatus()) }
+            var currentScreen by remember { mutableStateOf<Screen>(Screen.Map) }
             
             LaunchedEffect(Unit) {
                 while(true) {
@@ -40,19 +47,39 @@ class MainActivity : ComponentActivity() {
             }
 
             if (currentStatus == "APPROVED") {
-                MapScreen(
-                    onNavigateToProfile = {
-                        val intent = Intent(this@MainActivity, DriverProfileActivity::class.java)
-                        startActivity(intent)
-                    },
-                    onLogout = {
-                        sessionManager.logout()
-                        val intent = Intent(this@MainActivity, DriverLoginActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
+                when (val screen = currentScreen) {
+                    is Screen.Map -> {
+                        MapScreen(
+                            onNavigateToProfile = {
+                                val intent = Intent(this@MainActivity, DriverProfileActivity::class.java)
+                                startActivity(intent)
+                            },
+                            onLogout = {
+                                sessionManager.logout()
+                                val intent = Intent(this@MainActivity, DriverLoginActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                startActivity(intent)
+                                finish()
+                            },
+                            onNavigateToWallet = {
+                                currentScreen = Screen.Wallet
+                            },
+                            onNavigateToChat = { convId, name ->
+                                currentScreen = Screen.Chat(convId, name)
+                            }
+                        )
                     }
-                )
+                    is Screen.Wallet -> {
+                        WalletScreen(onBack = { currentScreen = Screen.Map })
+                    }
+                    is Screen.Chat -> {
+                        ChatScreen(
+                            conversationId = screen.conversationId,
+                            customerName = screen.customerName,
+                            onBack = { currentScreen = Screen.Map }
+                        )
+                    }
+                }
             } else {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Column(

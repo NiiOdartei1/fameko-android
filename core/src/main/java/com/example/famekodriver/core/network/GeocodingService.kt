@@ -67,6 +67,26 @@ interface FamekoApiService {
     suspend fun getDriverStatus(
         @Path("id") driverId: String
     ): DriverStatusResponse
+
+    @POST("chat/send")
+    suspend fun sendMessage(
+        @Body message: Message
+    ): Message
+
+    @GET("chat/history/{convId}")
+    suspend fun getChatHistory(
+        @Path("convId") convId: Int
+    ): List<Message>
+
+    @GET("wallet/balance/{driverId}")
+    suspend fun getWalletBalance(
+        @Path("driverId") driverId: String
+    ): Map<String, Double>
+
+    @GET("wallet/transactions/{driverId}")
+    suspend fun getWalletTransactions(
+        @Path("driverId") driverId: String
+    ): List<Map<String, Any>>
 }
 
 data class DriverStatusResponse(

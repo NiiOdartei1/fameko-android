@@ -70,6 +70,10 @@ object NetworkClient {
         retrofit.create(OpenStreetMapService::class.java)
     }
 
+    fun getWebSocketUrl(userId: String): String {
+        return BASE_URL.replace("http", "ws") + "ws/$userId"
+    }
+
     // Keep for backward compatibility until all calls are migrated
     val geocodingService: FamekoApiService by lazy { famekoApi }
 }

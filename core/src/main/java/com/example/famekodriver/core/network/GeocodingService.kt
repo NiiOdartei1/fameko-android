@@ -55,12 +55,12 @@ interface FamekoApiService {
         @Part ghana_card: MultipartBody.Part? = null
     ): AuthResponse
 
-    @Multipart
+    @FormUrlEncoded
     @POST("driver/upload-document")
     suspend fun uploadDriverDocument(
-        @Part("driver_id") driverId: RequestBody,
-        @Part("doc_type") docType: RequestBody, // e.g., "profile_pic", "drivers_license"
-        @Part document: MultipartBody.Part
+        @Field("driver_id") driverId: String,
+        @Field("doc_type") docType: String,
+        @Field("file_url") fileUrl: String
     ): AuthResponse
 
     @GET("driver/status/{id}")

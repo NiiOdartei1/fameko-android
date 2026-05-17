@@ -184,64 +184,29 @@ fun Application.configureRouting() {
         }
 
         post("/driver/upload-document") {
-            println("RECEIVED: Request to upload document")
+            println("RECEIVED: Request to save document URL")
             try {
-                val multipartData = call.receiveMultipart()
-                var driverId: String? = null
-                var docType: String? = null
-                var fileName: String? = null
-                var fileBytes: ByteArray? = null
+                val parameters = call.receiveParameters()
+                val driverId = parameters["driver_id"]
+                val docType = parameters["doc_type"]
+                val fileUrl = parameters["file_url"]
 
-                multipartData.forEachPart { part ->
-                    println("PROCESSING PART: ${part.name}")
-                    when (part) {
-                        is PartData.FormItem -> {
-                            if (part.name == "driver_id") {
-                                driverId = part.value
-                                println("DRIVER ID: $driverId")
-                            }
-                            if (part.name == "doc_type") {
-                                docType = part.value
-                                println("DOC TYPE: $docType")
-                            }
-                        }
-                        is PartData.FileItem -> {
-                            fileName = part.originalFileName
-                            fileBytes = part.streamProvider().readBytes()
-                            println("FILE RECEIVED: $fileName (${fileBytes.size} bytes)")
-                        }
-                        else -> {}
-                    }
-                    part.dispose()
-                }
-
-                if (driverId != null && docType != null && fileBytes != null) {
-                    println("SAVING DOCUMENT to disk and DB for driver $driverId")
-                    
-                    // Create uploads directory if not exists
-                    val uploadDir = java.io.File("uploads")
-                    if (!uploadDir.exists()) uploadDir.mkdirs()
-                    
-                    // Save actual file
-                    val safeFileName = "${driverId}_${docType}_${System.currentTimeMillis()}.jpg"
-                    val file = java.io.File(uploadDir, safeFileName)
-                    file.writeBytes(fileBytes)
-                    
-                    updateDriverDocument(driverId!!, docType!!, safeFileName)
-
-                    call.respond(AuthResponse(true, "Document uploaded successfully", driverId, null))
+                if (driverId != null && docType != null && fileUrl != null) {
+                    println("SAVING CLOUDINARY URL to DB for driver $driverId ($docType)")
+                    updateDriverDocument(driverId, docType, fileUrl)
+                    call.respond(AuthResponse(true, "Document link saved successfully", driverId, null))
                 } else {
                     val missing = mutableListOf<String>()
                     if (driverId == null) missing.add("driver_id")
                     if (docType == null) missing.add("doc_type")
-                    if (fileBytes == null) missing.add("file content")
+                    if (fileUrl == null) missing.add("file_url")
                     println("ERROR: Missing data: ${missing.joinToString(", ")}")
-                    call.respond(AuthResponse(false, "Missing upload data: ${missing.joinToString(", ")}", null, null))
+                    call.respond(AuthResponse(false, "Missing data: ${missing.joinToString(", ")}", null, null))
                 }
             } catch (e: Exception) {
-                println("EXCEPTION during upload: ${e.message}")
+                println("EXCEPTION during link save: ${e.message}")
                 e.printStackTrace()
-                call.respond(AuthResponse(false, "Upload failed: ${e.message}", null, null))
+                call.respond(AuthResponse(false, "Failed to save link: ${e.message}", null, null))
             }
         }
 

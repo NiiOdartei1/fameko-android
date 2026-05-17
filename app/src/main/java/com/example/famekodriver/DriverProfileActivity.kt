@@ -53,6 +53,23 @@ class DriverProfileActivity : AppCompatActivity() {
         setupDocItem(R.id.layoutRoadworthy, "Roadworthy Certificate", "roadworthy_cert")
         
         refreshStatus()
+        startApprovalPolling()
+    }
+
+    private fun startApprovalPolling() {
+        val driverId = sessionManager.getDriverId() ?: return
+        lifecycleScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(10000) // Poll every 10 seconds
+                repository.getDriverStatus(driverId).onSuccess { response ->
+                    if (response.status == "APPROVED") {
+                        sessionManager.updateStatus("APPROVED")
+                        Toast.makeText(this@DriverProfileActivity, "Your account has been approved!", Toast.LENGTH_LONG).show()
+                        finish() // Close profile and return to Map
+                    }
+                }
+            }
+        }
     }
 
     private fun setupDocItem(layoutId: Int, title: String, type: String) {

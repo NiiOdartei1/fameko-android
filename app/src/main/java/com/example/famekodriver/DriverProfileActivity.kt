@@ -92,14 +92,15 @@ class DriverProfileActivity : AppCompatActivity() {
     private fun updateDocStatus(layoutId: Int, uploaded: Boolean) {
         val view = findViewById<View>(layoutId)
         val tvStatus = view.findViewById<TextView>(R.id.tvDocStatus)
+        val btnUpload = view.findViewById<MaterialButton>(R.id.btnUpload)
         if (uploaded) {
             tvStatus.text = "Uploaded"
             tvStatus.setTextColor(android.graphics.Color.parseColor("#28A745"))
-            view.findViewById<MaterialButton>(R.id.btnUpload).text = "Replace"
+            btnUpload.text = "Replace"
         } else {
             tvStatus.text = "Not uploaded"
             tvStatus.setTextColor(android.graphics.Color.parseColor("#DC3545"))
-            view.findViewById<MaterialButton>(R.id.btnUpload).text = "Upload"
+            btnUpload.text = "Upload"
         }
     }
 

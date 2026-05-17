@@ -423,9 +423,9 @@
                                     </form>
                                 </div>
                                 <div th:unless="${driver['status'] == 'PENDING'}">
-                                    <button class="btn" style="background: #f8f9fa; color: #adb5bd; cursor: default">
-                                        <i class="fas fa-lock"></i> Processed
-                                    </button>
+                                    <a th:href="${'/admin/driver/' + driver['id']}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">
+                                        <i class="fas fa-eye"></i> View Profile
+                                    </a>
                                 </div>
                             </td>
                         </tr>

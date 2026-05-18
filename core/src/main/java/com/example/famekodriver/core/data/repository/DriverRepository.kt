@@ -41,6 +41,28 @@ class DriverRepository {
                             val delivery = gson.fromJson(wsMessage.payload, Delivery::class.java)
                             _events.tryEmit(FamekoEvent.NewDeliveryRequest(delivery))
                         }
+                        "CALL_INCOMING", "call_incoming", "driver_call_incoming" -> {
+                            val data = gson.fromJson(wsMessage.payload, Map::class.java)
+                            val callId = data["call_id"]?.toString() ?: ""
+                            val name = data["customer_name"]?.toString() ?: data["driver_name"]?.toString() ?: "Someone"
+                            _events.tryEmit(FamekoEvent.IncomingCall(callId, name))
+                        }
+                        "CALL_ACCEPTED", "call_accepted" -> {
+                            val data = gson.fromJson(wsMessage.payload, Map::class.java)
+                            val callId = data["call_id"]?.toString() ?: ""
+                            _events.tryEmit(FamekoEvent.CallAccepted(callId))
+                        }
+                        "CALL_REJECTED", "call_rejected" -> {
+                            val data = gson.fromJson(wsMessage.payload, Map::class.java)
+                            val callId = data["call_id"]?.toString() ?: ""
+                            val reason = data["reason"]?.toString()
+                            _events.tryEmit(FamekoEvent.CallRejected(callId, reason))
+                        }
+                        "CALL_ENDED", "call_ended" -> {
+                            val data = gson.fromJson(wsMessage.payload, Map::class.java)
+                            val callId = data["call_id"]?.toString() ?: ""
+                            _events.tryEmit(FamekoEvent.CallEnded(callId))
+                        }
                         "STATUS_CHANGED" -> {
                             // Handle status changes
                         }
@@ -630,6 +652,41 @@ class DriverRepository {
             Result.success(response)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun cancelOrder(orderId: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val response = NetworkClient.famekoApi.cancelOrder(orderId)
+            if (response["success"] == true) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response["message"]?.toString() ?: "Cancellation failed"))
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("FamekoRepo", "Order cancellation via API failed, falling back to JDBC", e)
+            try {
+                ensureDriverLoaded()
+                DriverManager.getConnection(
+                    DatabaseConfig.getJdbcUrl(),
+                    DatabaseConfig.DB_USER,
+                    DatabaseConfig.DB_PASS,
+                ).use { connection ->
+                    val query = "UPDATE orders SET status = 'Cancelled' WHERE id = ?"
+                    connection.prepareStatement(query).use { stmt ->
+                        stmt.setInt(1, orderId)
+                        stmt.executeUpdate()
+                    }
+                    val deliveryQuery = "UPDATE deliveries SET status = 'CANCELLED' WHERE order_id = ?"
+                    connection.prepareStatement(deliveryQuery).use { stmt ->
+                        stmt.setInt(1, orderId)
+                        stmt.executeUpdate()
+                    }
+                    Result.success(Unit)
+                }
+            } catch (e2: Exception) {
+                Result.failure(e2)
+            }
         }
     }
 

@@ -6,6 +6,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import android.media.Ringtone
+import android.media.RingtoneManager
+import androidx.compose.material.icons.filled.NotificationsActive
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -107,6 +110,7 @@ fun MapScreen(
     var mapView by remember { mutableStateOf<MapView?>(null) }
     var activeRequest by remember { mutableStateOf<Delivery?>(null) }
     var currentDelivery by remember { mutableStateOf<Delivery?>(null) }
+    var incomingCall by remember { mutableStateOf<FamekoEvent.IncomingCall?>(null) }
     var isAccepting by remember { mutableStateOf(false) }
     var driverStats by remember { mutableStateOf(DriverStats()) }
     var driverStatus by remember { mutableStateOf(sessionManager.getDriverStatus()) }
@@ -114,6 +118,31 @@ fun MapScreen(
     var driverLatLng by remember { mutableStateOf<GeoPoint?>(null) }
     var heatmapPoints by remember { mutableStateOf<List<HeatmapPoint>>(emptyList()) }
     var currentSurge by remember { mutableStateOf<SurgeInfo?>(null) }
+
+    // Sound Management
+    val ringtone = remember {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        RingtoneManager.getRingtone(context, uri)
+    }
+
+    val notificationSound = remember {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        RingtoneManager.getRingtone(context, uri)
+    }
+
+    LaunchedEffect(activeRequest, incomingCall) {
+        if (activeRequest != null || incomingCall != null) {
+            ringtone.play()
+        } else {
+            ringtone.stop()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            ringtone.stop()
+        }
+    }
 
     LaunchedEffect(isOnline) {
         if (isOnline) {
@@ -168,6 +197,12 @@ fun MapScreen(
                 }
                 is FamekoEvent.NewMessage -> {
                     // Show notification or update chat UI
+                }
+                is FamekoEvent.IncomingCall -> {
+                    incomingCall = event
+                }
+                is FamekoEvent.CallEnded, is FamekoEvent.CallRejected -> {
+                    incomingCall = null
                 }
                 else -> {}
             }
@@ -660,7 +695,7 @@ fun MapScreen(
                     onClick = { isOnline = !isOnline },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = if (activeRequest != null) 420.dp else 32.dp) // Move way up if request is showing so it's clickable
+                        .padding(bottom = if (activeRequest != null) 420.dp else 32.dp)
                         .height(64.dp)
                         .fillMaxWidth(0.6f),
                     colors = ButtonDefaults.buttonColors(
@@ -676,6 +711,38 @@ fun MapScreen(
                         letterSpacing = 1.sp
                     )
                 }
+            }
+
+            incomingCall?.let { call ->
+                AlertDialog(
+                    onDismissRequest = { /* Don't dismiss by clicking outside */ },
+                    title = { Text("Incoming Call") },
+                    text = { Text("Customer ${call.callerName} is calling you...") },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                incomingCall = null
+                                // Accept logic here (navigate to call screen)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28A745))
+                        ) {
+                            Icon(Icons.Default.Call, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Accept")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(
+                            onClick = {
+                                incomingCall = null
+                                // Reject logic here
+                            }
+                        ) {
+                            Text("Reject", color = Color.Red)
+                        }
+                    },
+                    shape = RoundedCornerShape(24.dp)
+                )
             }
         }
     }

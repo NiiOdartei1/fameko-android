@@ -10,15 +10,15 @@ import java.util.concurrent.TimeUnit
  */
 object NetworkClient {
     // TOGGLE THIS: true = Local Backend, false = Production
-    private const val USE_LOCAL_BACKEND = false
+    private const val USE_LOCAL_BACKEND = true
 
     private const val PRODUCTION_URL = "https://fameko-backend-1.onrender.com/"
     private const val PRODUCTION_ROUTING_URL = "https://fameko-android.onrender.com/"
 
     // 10.0.2.2 is ONLY for Emulators. 
-    // YOUR PHONE is on 192.168.1.159.
+    // YOUR PHONE is on 192.168.100.x
     // Set this to your COMPUTER'S IP (from 'ipconfig')
-    private const val YOUR_COMPUTER_IP = "192.168.1.166"
+    private const val YOUR_COMPUTER_IP = "192.168.100.118"
     private const val LOCAL_URL = "http://$YOUR_COMPUTER_IP:8080/"
     private const val LOCAL_ROUTING_URL = "http://$YOUR_COMPUTER_IP:8012/"
 

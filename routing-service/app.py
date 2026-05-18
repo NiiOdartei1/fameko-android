@@ -258,21 +258,28 @@ def create_app(config=None):
         sid = flask_request.sid
         
         driver_id = data.get('driver_id')
-        logger.info(f"[SOCKETIO] Driver authentication event - sid: {sid}, driver_id: {driver_id}, current_user: {current_user}")
+        logger.info(f"[SOCKETIO] Driver authentication event - sid: {sid}, driver_id: {driver_id}")
         
-        # Verify we have current_user
-        if current_user and isinstance(current_user, Driver):
-            if current_user.id == driver_id:
-                logger.info(f"✓ [SOCKETIO] Driver {driver_id} authenticated via event")
-                join_room(f'driver_{driver_id}')
-                driver_socket_map[sid] = driver_id
-                emit('authenticated', {'status': 'ok', 'driver_id': driver_id})
+        # Verify identification - use session if available, otherwise trust provided ID in dev
+        driver_obj = None
+        if current_user and isinstance(current_user, Driver) and current_user.id == driver_id:
+            driver_obj = current_user
+            logger.info(f"✓ [SOCKETIO] Driver {driver_id} authenticated via session")
+        elif driver_id:
+            # Fallback for mobile clients without shared session
+            driver_obj = Driver.query.get(driver_id)
+            if driver_obj:
+                logger.info(f"✓ [SOCKETIO] Driver {driver_id} identified via database lookup")
             else:
-                logger.warning(f"✗ [SOCKETIO] Driver {driver_id} auth failed - mismatched ID (current: {current_user.id})")
-                emit('authenticated', {'status': 'error', 'reason': 'ID mismatch'})
+                logger.warning(f"✗ [SOCKETIO] Driver {driver_id} not found in database")
+
+        if driver_obj:
+            join_room(f'driver_{driver_id}')
+            driver_socket_map[sid] = driver_id
+            emit('authenticated', {'status': 'ok', 'driver_id': driver_id})
         else:
-            logger.warning(f"✗ [SOCKETIO] Driver {driver_id} auth failed - not authenticated")
-            emit('authenticated', {'status': 'error', 'reason': 'Not authenticated'})
+            logger.warning(f"✗ [SOCKETIO] Driver authentication failed")
+            emit('authenticated', {'status': 'error', 'reason': 'Invalid identification'})
 
     
     @socketio.on('location_update', namespace='/driver')
@@ -361,27 +368,45 @@ def create_app(config=None):
         sid = flask_request.sid
         
         customer_id = data.get('customer_id')
-        logger.info(f"[SOCKETIO] Customer authentication event - sid: {sid}, customer_id: {customer_id}, current_user: {current_user}")
+        logger.info(f"[SOCKETIO] Customer authentication event - sid: {sid}, customer_id: {customer_id}")
         
-        if current_user and isinstance(current_user, Customer):
-            if current_user.id == customer_id:
-                logger.info(f"✓ [SOCKETIO] Customer {customer_id} authenticated via event")
-                join_room(f'customer_{customer_id}')
-                customer_socket_map[sid] = customer_id
-                emit('authenticated', {'status': 'ok', 'customer_id': customer_id})
+        # Verify identification
+        customer_obj = None
+        if current_user and isinstance(current_user, Customer) and current_user.id == customer_id:
+            customer_obj = current_user
+            logger.info(f"✓ [SOCKETIO] Customer {customer_id} authenticated via session")
+        elif customer_id:
+            # Fallback for mobile clients without shared session
+            customer_obj = Customer.query.get(customer_id)
+            if customer_obj:
+                logger.info(f"✓ [SOCKETIO] Customer {customer_id} identified via database lookup")
             else:
-                logger.warning(f"✗ [SOCKETIO] Customer {customer_id} auth failed - mismatched ID (current: {current_user.id})")
-                emit('authenticated', {'status': 'error', 'reason': 'ID mismatch'})
+                logger.warning(f"✗ [SOCKETIO] Customer {customer_id} not found in database")
+
+        if customer_obj:
+            join_room(f'customer_{customer_id}')
+            customer_socket_map[sid] = customer_id
+            emit('authenticated', {'status': 'ok', 'customer_id': customer_id})
         else:
-            logger.warning(f"✗ [SOCKETIO] Customer {customer_id} auth failed - not authenticated")
-            emit('authenticated', {'status': 'error', 'reason': 'Not authenticated'})
+            logger.warning(f"✗ [SOCKETIO] Customer authentication failed")
+            emit('authenticated', {'status': 'error', 'reason': 'Invalid identification'})
 
     # ─── CALL EVENTS ───────────────────────────────────
     @socketio.on('call_initiate', namespace='/customer')
     def handle_call_initiate(data):
         """Customer initiates a call to driver"""
-        if not current_user or not isinstance(current_user, Customer):
-            logger.warning(f"[CALL] Unauthorized call_initiate - current_user: {current_user}")
+        # Identify the caller (Customer)
+        customer_id = data.get('customer_id')
+        customer_obj = None
+
+        if current_user and isinstance(current_user, Customer):
+            customer_obj = current_user
+            customer_id = customer_obj.id
+        elif customer_id:
+            customer_obj = Customer.query.get(customer_id)
+
+        if not customer_obj:
+            logger.warning(f"[CALL] Unauthorized call_initiate - no valid customer found. Data: {data}")
             emit('error', {'message': 'Unauthorized'})
             return
         
@@ -393,33 +418,30 @@ def create_app(config=None):
             emit('error', {'message': 'Missing driver_id or delivery_id'})
             return
         
-        logger.info(f"[CALL] ✓ Customer {current_user.id} initiating call to driver {driver_id} for delivery {delivery_id}")
-        logger.info(f"[CALL] Customer name field: '{current_user.name}', email field: '{current_user.email}'")
+        logger.info(f"[CALL] ✓ Customer {customer_id} initiating call to driver {driver_id} for delivery {delivery_id}")
 
-        # Use name if available, otherwise extract from email
-        if current_user.name:
-            customer_display_name = current_user.name
-        elif current_user.email:
-            # Extract name from email (e.g., "takyimildred4" from "takyimildred4@gmail.com")
-            email_name = current_user.email.split('@')[0]
-            # Remove numbers and capitalize
+        # Determine display name
+        if customer_obj.name:
+            customer_display_name = customer_obj.name
+        elif customer_obj.email:
+            email_name = customer_obj.email.split('@')[0]
             import re
             customer_display_name = re.sub(r'\d+', '', email_name).title()
         else:
-            customer_display_name = f'Customer #{current_user.id}'
+            customer_display_name = f'Customer #{customer_id}'
         
-        logger.info(f"[CALL] Using customer display name: '{customer_display_name}'")
-
+        # Standard format: driverID_customerID_deliveryID_timestamp
+        # This matches signaling handlers which expect target Callee at parts[0] for customer side events
+        # and Callee at parts[1] for driver side events.
         call_payload = {
-            'customer_id': current_user.id,
+            'customer_id': customer_id,
             'customer_name': customer_display_name,
             'delivery_id': delivery_id,
-            'call_id': f"{current_user.id}_{driver_id}_{delivery_id}_{int(__import__('time').time())}"
+            'call_id': f"{driver_id}_{customer_id}_{delivery_id}_{int(__import__('time').time())}"
         }
 
         # Send call notification to driver
         logger.info(f"[CALL] Emitting 'call_incoming' to room driver_{driver_id} namespace /driver")
-        logger.info(f"[CALL] Call payload: {call_payload}")
         result = socketio.emit('call_incoming', call_payload, room=f'driver_{driver_id}', namespace='/driver')
         logger.info(f"[CALL] Emit result: {result}")
 
@@ -466,7 +488,15 @@ def create_app(config=None):
     @socketio.on('call_accept', namespace='/driver')
     def handle_call_accept(data):
         """Driver accepts incoming call"""
-        if not current_user or not isinstance(current_user, Driver):
+        driver_id = data.get('driver_id')
+        driver_obj = None
+
+        if current_user and isinstance(current_user, Driver):
+            driver_obj = current_user
+        elif driver_id:
+            driver_obj = Driver.query.get(driver_id)
+
+        if not driver_obj:
             emit('error', {'message': 'Unauthorized'})
             return
         
@@ -474,27 +504,29 @@ def create_app(config=None):
         delivery_id = data.get('delivery_id')
         call_id = data.get('call_id')
         
-        logger.info(f"Driver {current_user.id} accepted call from customer {customer_id}")
+        logger.info(f"Driver {driver_obj.id} accepted call from customer {customer_id}")
         
         # Notify customer that call was accepted
         logger.info(f"[CALL] Emitting 'call_accepted' to room customer_{customer_id} namespace /customer")
         socketio.emit('call_accepted', {
-            'driver_id': current_user.id,
-            'driver_name': current_user.full_name,
+            'driver_id': driver_obj.id,
+            'driver_name': driver_obj.full_name,
             'call_id': call_id
         }, room=f'customer_{customer_id}', namespace='/customer')
     
     @socketio.on('call_reject', namespace='/driver')
     def handle_call_reject(data):
         """Driver rejects incoming call"""
+        driver_id = data.get('driver_id')
         if not current_user or not isinstance(current_user, Driver):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not driver_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
         
         customer_id = data.get('customer_id')
         call_id = data.get('call_id')
         
-        logger.info(f"Driver {current_user.id} rejected call from customer {customer_id}")
+        logger.info(f"Driver {driver_id or current_user.id} rejected call from customer {customer_id}")
         
         # Notify customer that call was rejected
         logger.info(f"[CALL] Emitting 'call_rejected' to room customer_{customer_id} namespace /customer")
@@ -506,20 +538,22 @@ def create_app(config=None):
     @socketio.on('call_end', namespace='/customer')
     def handle_call_end_customer(data):
         """Customer ends call"""
+        customer_id = data.get('customer_id')
         if not current_user or not isinstance(current_user, Customer):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not customer_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
         
         driver_id = data.get('driver_id')
         delivery_id = data.get('delivery_id')
         call_id = data.get('call_id')
         
-        logger.info(f"Customer {current_user.id} ended call with driver {driver_id}")
+        logger.info(f"Customer {customer_id or current_user.id} ended call with driver {driver_id}")
         
         # Notify driver
         socketio.emit('call_ended', {
             'call_id': call_id,
-            'customer_id': current_user.id,
+            'customer_id': customer_id or current_user.id,
             'delivery_id': delivery_id,
             'ended_by': 'customer'
         }, room=f'driver_{driver_id}', namespace='/driver')
@@ -527,15 +561,17 @@ def create_app(config=None):
     @socketio.on('call_accept_driver_call', namespace='/customer')
     def handle_call_accept_driver_call(data):
         """Customer accepts incoming call from driver"""
+        customer_id = data.get('customer_id')
         if not current_user or not isinstance(current_user, Customer):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not customer_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
         
         driver_id = data.get('driver_id')
         delivery_id = data.get('delivery_id')
         call_id = data.get('call_id')
         
-        logger.info(f"Customer {current_user.id} accepted incoming call from driver {driver_id}")
+        logger.info(f"Customer {customer_id or current_user.id} accepted incoming call from driver {driver_id}")
         
         # Notify driver that customer accepted
         logger.info(f"[CALL] Emitting 'call_accepted_by_customer' to room driver_{driver_id} namespace /driver")
@@ -547,14 +583,16 @@ def create_app(config=None):
     @socketio.on('call_end', namespace='/driver')
     def handle_call_end_driver(data):
         """Driver ends call"""
+        driver_id = data.get('driver_id')
         if not current_user or not isinstance(current_user, Driver):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not driver_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
         
         customer_id = data.get('customer_id')
         call_id = data.get('call_id')
         
-        logger.info(f"Driver {current_user.id} ended call with customer {customer_id}")
+        logger.info(f"Driver {driver_id or current_user.id} ended call with customer {customer_id}")
         
         # Notify customer
         socketio.emit('call_ended', {
@@ -565,7 +603,17 @@ def create_app(config=None):
     @socketio.on('call_initiate', namespace='/driver')
     def handle_driver_call_initiate(data):
         """Driver initiates a call to customer"""
-        if not current_user or not isinstance(current_user, Driver):
+        driver_id = data.get('driver_id')
+        driver_obj = None
+
+        if current_user and isinstance(current_user, Driver):
+            driver_obj = current_user
+            driver_id = driver_obj.id
+        elif driver_id:
+            driver_obj = Driver.query.get(driver_id)
+
+        if not driver_obj:
+            logger.warning(f"[CALL] Unauthorized driver call_initiate - id: {driver_id}")
             emit('error', {'message': 'Unauthorized'})
             return
         
@@ -576,13 +624,13 @@ def create_app(config=None):
             emit('error', {'message': 'Missing customer_id or delivery_id'})
             return
         
-        logger.info(f"[CALL] Driver {current_user.id} initiating call to customer {customer_id} for delivery {delivery_id}")
+        logger.info(f"[CALL] Driver {driver_obj.id} initiating call to customer {customer_id} for delivery {delivery_id}")
 
         call_payload = {
-            'driver_id': current_user.id,
-            'driver_name': current_user.full_name if current_user.full_name else current_user.email,
+            'driver_id': driver_obj.id,
+            'driver_name': driver_obj.full_name if driver_obj.full_name else driver_obj.email,
             'delivery_id': delivery_id,
-            'call_id': f"{current_user.id}_{customer_id}_{delivery_id}_{int(__import__('time').time())}"
+            'call_id': f"{driver_obj.id}_{customer_id}_{delivery_id}_{int(__import__('time').time())}"
         }
 
         logger.info(f"[CALL] Call payload: {call_payload}")
@@ -640,14 +688,16 @@ def create_app(config=None):
     @socketio.on('webrtc_offer', namespace='/customer')
     def handle_webrtc_offer_customer(data):
         """Customer sends WebRTC offer to driver"""
+        customer_id = data.get('customer_id')
         if not current_user or not isinstance(current_user, Customer):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not customer_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
 
         call_id = data.get('call_id')
         offer = data.get('offer')
 
-        logger.info(f"[WEBRTC] Customer {current_user.id} sending offer for call {call_id}")
+        logger.info(f"[WEBRTC] Customer {customer_id or current_user.id} sending offer for call {call_id}")
 
         # Extract driver_id from call_id (format: driver_customer_delivery_timestamp)
         if call_id:
@@ -665,14 +715,16 @@ def create_app(config=None):
     @socketio.on('webrtc_offer', namespace='/driver')
     def handle_webrtc_offer_driver(data):
         """Driver sends WebRTC offer to customer"""
+        driver_id = data.get('driver_id')
         if not current_user or not isinstance(current_user, Driver):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not driver_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
 
         call_id = data.get('call_id')
         offer = data.get('offer')
 
-        logger.info(f"[WEBRTC] Driver {current_user.id} sending offer for call {call_id}")
+        logger.info(f"[WEBRTC] Driver {driver_id or current_user.id} sending offer for call {call_id}")
 
         # Extract customer_id from call_id (format: driver_customer_delivery_timestamp)
         if call_id:
@@ -690,14 +742,16 @@ def create_app(config=None):
     @socketio.on('webrtc_answer', namespace='/customer')
     def handle_webrtc_answer_customer(data):
         """Customer sends WebRTC answer to driver"""
+        customer_id = data.get('customer_id')
         if not current_user or not isinstance(current_user, Customer):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not customer_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
 
         call_id = data.get('call_id')
         answer = data.get('answer')
 
-        logger.info(f"[WEBRTC] Customer {current_user.id} sending answer for call {call_id}")
+        logger.info(f"[WEBRTC] Customer {customer_id or current_user.id} sending answer for call {call_id}")
 
         # Extract driver_id from call_id
         if call_id:
@@ -715,14 +769,16 @@ def create_app(config=None):
     @socketio.on('webrtc_answer', namespace='/driver')
     def handle_webrtc_answer_driver(data):
         """Driver sends WebRTC answer to customer"""
+        driver_id = data.get('driver_id')
         if not current_user or not isinstance(current_user, Driver):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not driver_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
 
         call_id = data.get('call_id')
         answer = data.get('answer')
 
-        logger.info(f"[WEBRTC] Driver {current_user.id} sending answer for call {call_id}")
+        logger.info(f"[WEBRTC] Driver {driver_id or current_user.id} sending answer for call {call_id}")
 
         # Extract customer_id from call_id
         if call_id:
@@ -740,14 +796,16 @@ def create_app(config=None):
     @socketio.on('webrtc_ice_candidate', namespace='/customer')
     def handle_webrtc_ice_candidate_customer(data):
         """Customer sends ICE candidate to driver"""
+        customer_id = data.get('customer_id')
         if not current_user or not isinstance(current_user, Customer):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not customer_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
 
         call_id = data.get('call_id')
         candidate = data.get('candidate')
 
-        logger.info(f"[WEBRTC] Customer {current_user.id} sending ICE candidate for call {call_id}")
+        logger.info(f"[WEBRTC] Customer {customer_id or current_user.id} sending ICE candidate for call {call_id}")
 
         # Extract driver_id from call_id
         if call_id:
@@ -765,14 +823,16 @@ def create_app(config=None):
     @socketio.on('webrtc_ice_candidate', namespace='/driver')
     def handle_webrtc_ice_candidate_driver(data):
         """Driver sends ICE candidate to customer"""
+        driver_id = data.get('driver_id')
         if not current_user or not isinstance(current_user, Driver):
-            emit('error', {'message': 'Unauthorized'})
-            return
+            if not driver_id:
+                emit('error', {'message': 'Unauthorized'})
+                return
 
         call_id = data.get('call_id')
         candidate = data.get('candidate')
 
-        logger.info(f"[WEBRTC] Driver {current_user.id} sending ICE candidate for call {call_id}")
+        logger.info(f"[WEBRTC] Driver {driver_id or current_user.id} sending ICE candidate for call {call_id}")
 
         # Extract customer_id from call_id
         if call_id:

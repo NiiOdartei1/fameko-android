@@ -413,6 +413,42 @@ fun Application.configureRouting() {
                     call.respond(mapOf("success" to false, "message" to e.message))
                 }
             }
+
+            post("/cancel/{orderId}") {
+                val orderId = call.parameters["orderId"]?.toIntOrNull()
+                if (orderId != null) {
+                    try {
+                        cancelOrderInDb(orderId)
+                        call.respond(mapOf("success" to true, "message" to "Order cancelled successfully"))
+                    } catch (e: Exception) {
+                        call.respond(mapOf("success" to false, "message" to (e.message ?: "Failed to cancel order")))
+                    }
+                } else {
+                    call.respond(mapOf("success" to false, "message" to "Invalid order ID"))
+                }
+            }
+        }
+    }
+}
+
+private fun cancelOrderInDb(orderId: Int) {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        conn.autoCommit = false
+        try {
+            // Update order status
+            val orderStmt = conn.prepareStatement("UPDATE orders SET status = 'Cancelled' WHERE id = ?")
+            orderStmt.setInt(1, orderId)
+            orderStmt.executeUpdate()
+
+            // Update delivery status if exists
+            val deliveryStmt = conn.prepareStatement("UPDATE deliveries SET status = 'CANCELLED' WHERE order_id = ?")
+            deliveryStmt.setInt(1, orderId)
+            deliveryStmt.executeUpdate()
+
+            conn.commit()
+        } catch (e: Exception) {
+            conn.rollback()
+            throw e
         }
     }
 }

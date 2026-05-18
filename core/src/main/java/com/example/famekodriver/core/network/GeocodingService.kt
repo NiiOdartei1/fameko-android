@@ -115,6 +115,11 @@ interface FamekoApiService {
         @Path("orderId") orderId: Int
     ): OrderStatusResponse
 
+    @POST("orders/cancel/{orderId}")
+    suspend fun cancelOrder(
+        @Path("orderId") orderId: Int
+    ): Map<String, Any>
+
     @GET("driver/nearby")
     suspend fun getNearbyDrivers(
         @Query("lat") lat: Double,

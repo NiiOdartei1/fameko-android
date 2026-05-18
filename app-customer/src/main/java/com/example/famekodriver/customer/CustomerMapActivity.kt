@@ -3,6 +3,7 @@ package com.example.famekodriver.customer
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -10,6 +11,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
+import android.media.RingtoneManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.famekodriver.core.data.SessionManager
 import com.example.famekodriver.core.data.repository.DriverRepository
+import com.example.famekodriver.core.domain.model.FamekoEvent
 import com.example.famekodriver.core.domain.model.DriverLocation
 import com.example.famekodriver.core.domain.model.RouteLocation
 import com.example.famekodriver.core.domain.model.RouteRequest
@@ -149,6 +152,56 @@ fun CustomerMapScreen() {
     
     var currentOrderId by remember { mutableStateOf<Int?>(null) }
     var orderStatusData by remember { mutableStateOf<OrderStatusResponse?>(null) }
+    var incomingCall by remember { mutableStateOf<FamekoEvent.IncomingCall?>(null) }
+
+    // Sound Management
+    val ringtone = remember {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        RingtoneManager.getRingtone(context, uri)
+    }
+
+    val notificationSound = remember {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        RingtoneManager.getRingtone(context, uri)
+    }
+
+    LaunchedEffect(Unit) {
+        val customerId = sessionManager.getDriverId() ?: "CUST-1"
+        repository.startWebSocket(customerId)
+        
+        repository.events.collect { event ->
+            when (event) {
+                is FamekoEvent.IncomingCall -> {
+                    incomingCall = event
+                }
+                is FamekoEvent.CallEnded, is FamekoEvent.CallRejected -> {
+                    incomingCall = null
+                }
+                else -> {}
+            }
+        }
+    }
+
+    LaunchedEffect(incomingCall) {
+        if (incomingCall != null) {
+            ringtone.play()
+        } else {
+            ringtone.stop()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            ringtone.stop()
+            repository.stopWebSocket()
+        }
+    }
+
+    LaunchedEffect(orderStatusData?.status) {
+        if (orderStatusData?.status == "ASSIGNED") {
+            notificationSound.play()
+        }
+    }
 
     var isPickupFocused by remember { mutableStateOf(false) }
     var isDropoffFocused by remember { mutableStateOf(false) }
@@ -574,10 +627,49 @@ fun CustomerMapScreen() {
 
         if (orderStatusData != null) {
             when (orderStatusData!!.status) {
-                "PENDING" -> SearchingOverlay(onCancel = { currentOrderId = null; orderStatusData = null })
-                "ASSIGNED", "IN_TRANSIT" -> DriverAssignedOverlay(orderStatusData!!)
+                "PENDING" -> SearchingOverlay(onCancel = { 
+                    scope.launch {
+                        currentOrderId?.let { repository.cancelOrder(it) }
+                        currentOrderId = null
+                        orderStatusData = null
+                    }
+                })
+                "ASSIGNED", "IN_TRANSIT" -> DriverAssignedOverlay(orderStatusData!!, currentOrderId ?: 0, onCancel = {
+                    scope.launch {
+                        currentOrderId?.let { repository.cancelOrder(it) }
+                        currentOrderId = null
+                        orderStatusData = null
+                        polylineGeoPoints = emptyList()
+                        estimatedFare = null
+                        Toast.makeText(context, "Ride cancelled", Toast.LENGTH_SHORT).show()
+                    }
+                })
             }
         }
+    }
+
+    incomingCall?.let { call ->
+        AlertDialog(
+            onDismissRequest = { /* Don't dismiss */ },
+            title = { Text("Incoming Call") },
+            text = { Text("Driver ${call.callerName} is calling you...") },
+            confirmButton = {
+                Button(
+                    onClick = { incomingCall = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28A745))
+                ) {
+                    Icon(Icons.Default.Call, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Accept")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { incomingCall = null }) {
+                    Text("Reject", color = Color.Red)
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 }
 
@@ -618,7 +710,8 @@ fun SearchingOverlay(onCancel: () -> Unit) {
 }
 
 @Composable
-fun DriverAssignedOverlay(data: OrderStatusResponse) {
+fun DriverAssignedOverlay(data: OrderStatusResponse, orderId: Int, onCancel: () -> Unit) {
+    val context = LocalContext.current
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -648,7 +741,66 @@ fun DriverAssignedOverlay(data: OrderStatusResponse) {
                         IconButton(onClick = {}) { Icon(Icons.AutoMirrored.Filled.Chat, null, tint = Color(0xFF004E89)) }
                     }
                 }
+                
                 Spacer(modifier = Modifier.height(16.dp))
+                
+                // Safety SOS & Share Trip Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, "Track my Fameko trip")
+                                putExtra(Intent.EXTRA_TEXT, "I'm on a Fameko trip! Track me live here: https://fameko-backend-1.onrender.com/track/$orderId")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share Trip via"))
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF004E89)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(Icons.Default.Share, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Share Trip", fontSize = 13.sp)
+                    }
+
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL).apply {
+                                this.data = "tel:911".toUri() // Change to local emergency number if needed
+                            }
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC3545)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(Icons.Default.Warning, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("SOS", fontSize = 13.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Cancel Button
+                OutlinedButton(
+                    onClick = onCancel,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
+                ) {
+                    Text("Cancel Ride", fontSize = 14.sp)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Surface(color = Color(0xFFF6F6F6), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.LocalTaxi, null, tint = Color(0xFF004E89))
@@ -657,6 +809,30 @@ fun DriverAssignedOverlay(data: OrderStatusResponse) {
                     }
                 }
             }
+        }
+
+        incomingCall?.let { call ->
+            AlertDialog(
+                onDismissRequest = { /* Don't dismiss */ },
+                title = { Text("Incoming Call") },
+                text = { Text("Driver ${call.callerName} is calling you...") },
+                confirmButton = {
+                    Button(
+                        onClick = { incomingCall = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28A745))
+                    ) {
+                        Icon(Icons.Default.Call, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Accept")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { incomingCall = null }) {
+                        Text("Reject", color = Color.Red)
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
         }
     }
 }

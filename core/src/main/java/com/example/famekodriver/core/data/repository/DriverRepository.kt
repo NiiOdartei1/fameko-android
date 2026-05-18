@@ -779,17 +779,18 @@ class DriverRepository {
                         // 1. Create Order
                         val orderQuery = """
                             INSERT INTO orders (customer_id, total_amount, status, latitude, longitude, payment_method, shipping_name, shipping_address, shipping_phone) 
-                            VALUES (?, ?, 'Pending', ?, ?, 'Cash on Delivery', 'Customer', ?, '0000000000') RETURNING id
+                            VALUES (?, ?, 'Pending', ?, ?, 'Cash on Delivery', 'Customer', ?, '0000000000')
                         """.trimIndent()
                         
-                        val orderId = connection.prepareStatement(orderQuery).use { stmt ->
+                        val orderId = connection.prepareStatement(orderQuery, java.sql.Statement.RETURN_GENERATED_KEYS).use { stmt ->
                             stmt.setInt(1, customerId.toInt())
                             stmt.setDouble(2, estimatedFare)
                             stmt.setDouble(3, dropoffLat)
                             stmt.setDouble(4, dropoffLng)
                             stmt.setString(5, dropoffLocation)
-                            val rs = stmt.executeQuery()
-                            if (rs.next()) rs.getInt(1) else throw Exception("Failed to create order")
+                            stmt.executeUpdate()
+                            val rsKeys = stmt.generatedKeys
+                            if (rsKeys.next()) rsKeys.getInt(1) else throw Exception("Failed to create order")
                         }
 
                         // 2. Create Delivery

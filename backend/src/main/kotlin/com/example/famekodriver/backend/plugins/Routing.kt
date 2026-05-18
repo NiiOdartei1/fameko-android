@@ -410,12 +410,17 @@ fun Application.configureRouting() {
 
         route("/orders") {
             post("/create") {
+                println("API: Received order creation request")
                 try {
                     val req = call.receive<OrderCreateRequest>()
+                    println("API: Order for customer ${req.customerId} to ${req.dropoffLocation}")
+                    
                     val orderId = createOrderAndDelivery(req)
                     if (orderId != null) {
+                        println("API: Order created with ID $orderId. Finding drivers...")
                         // DISPATCH INTELLIGENCE: Find closest drivers
                         val nearbyDrivers = findNearbyDrivers(req.pickupLat, req.pickupLng, radiusKm = 5.0, limit = 5)
+                        println("API: Found ${nearbyDrivers.size} nearby drivers")
                         
                         val delivery = getDeliveryByOrderId(orderId)
                         if (delivery != null) {
@@ -427,9 +432,12 @@ fun Application.configureRouting() {
                         
                         call.respond(mapOf("success" to true, "orderId" to orderId))
                     } else {
+                        println("API: Failed to create order in DB")
                         call.respond(mapOf("success" to false, "message" to "Failed to create order"))
                     }
                 } catch (e: Exception) {
+                    println("API: Error creating order: ${e.message}")
+                    e.printStackTrace()
                     call.respond(mapOf("success" to false, "message" to e.message))
                 }
             }
@@ -518,10 +526,11 @@ private fun findNearbyDrivers(lat: Double, lng: Double, radiusKm: Double, limit:
                 println("PostGIS not available, falling back to simple math search: ${spatialError.message}")
                 val fallbackSql = """
                     SELECT driver_id, 
-                    (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance
+                    (6371 * acos(least(1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) AS distance
                     FROM driver_stats
-                    WHERE is_online = true
-                    AND (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) < ?
+                    WHERE is_online = true 
+                    AND latitude IS NOT NULL AND longitude IS NOT NULL
+                    AND (6371 * acos(least(1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) < ?
                     ORDER BY distance
                     LIMIT ?
                 """.trimIndent()
@@ -554,12 +563,12 @@ private fun createOrderAndDelivery(req: OrderCreateRequest): Int? {
         DatabaseInitializer.getDataSource().connection.use { conn ->
             conn.autoCommit = false
             try {
-                val orderSql = "INSERT INTO orders (customer_id, total_amount, shipping_name, shipping_address, shipping_phone, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                val orderSql = "INSERT INTO orders (customer_id, total_amount, shipping_name, shipping_address, shipping_phone, latitude, longitude, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending')"
                 val oStmt = conn.prepareStatement(orderSql, java.sql.Statement.RETURN_GENERATED_KEYS)
                 oStmt.setInt(1, req.customerId.toInt())
                 oStmt.setDouble(2, req.estimatedFare)
                 oStmt.setString(3, "Customer")
-                oStmt.setString(4, req.pickupLocation) // Using pickup as shipping address
+                oStmt.setString(4, req.pickupLocation)
                 oStmt.setString(5, "0000000000")
                 oStmt.setDouble(6, req.pickupLat)
                 oStmt.setDouble(7, req.pickupLng)

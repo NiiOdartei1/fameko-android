@@ -132,15 +132,15 @@ fun MapScreen(
 
     LaunchedEffect(activeRequest, incomingCall) {
         if (activeRequest != null || incomingCall != null) {
-            ringtone.play()
+            ringtone?.play()
         } else {
-            ringtone.stop()
+            ringtone?.stop()
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            ringtone.stop()
+            ringtone?.stop()
         }
     }
 

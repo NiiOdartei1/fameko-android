@@ -185,22 +185,22 @@ fun CustomerMapScreen() {
 
     LaunchedEffect(incomingCall) {
         if (incomingCall != null) {
-            ringtone.play()
+            ringtone?.play()
         } else {
-            ringtone.stop()
+            ringtone?.stop()
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            ringtone.stop()
+            ringtone?.stop()
             repository.stopWebSocket()
         }
     }
 
     LaunchedEffect(orderStatusData?.status) {
         if (orderStatusData?.status == "ASSIGNED") {
-            notificationSound.play()
+            notificationSound?.play()
         }
     }
 

@@ -198,15 +198,25 @@ fun Application.configureRouting() {
         }
 
         post("/driver/login") {
+            println("RECEIVED: Driver login request for ${call.request.local.remoteAddress}")
             try {
                 val request = call.receive<LoginRequest>()
+                println("API: Driver login attempt for ${request.email}")
                 val driver = loginDriverInDb(request.email, request.password)
                 if (driver != null) {
-                    call.respond(AuthResponse(true, "Login successful", driver["id"].toString(), driver["name"].toString(), driver["status"].toString()))
+                    val id = driver["id"]?.toString() ?: ""
+                    val name = driver["name"]?.toString() ?: "Driver"
+                    val status = driver["status"]?.toString() ?: "PENDING"
+                    
+                    println("API: Driver login successful for ${request.email}, status: $status")
+                    call.respond(AuthResponse(true, "Login successful", id, name, status))
                 } else {
+                    println("API: Driver login failed - invalid credentials for ${request.email}")
                     call.respond(AuthResponse(false, "Invalid email or password", null, null))
                 }
             } catch (e: Exception) {
+                println("API: Driver login error: ${e.message}")
+                e.printStackTrace()
                 call.respond(AuthResponse(false, e.message ?: "Unknown error", null, null))
             }
         }
@@ -326,9 +336,21 @@ fun Application.configureRouting() {
         }
 
         get("/driver/status/{id}") {
-            val id = call.parameters["id"] ?: return@get call.respond(AuthResponse(false, "Missing ID", null, null))
-            val statusData = getDriverStatusFromDb(id)
-            call.respond(statusData)
+            val id = call.parameters["id"]
+            if (id == null) {
+                call.respond(DriverStatusResponse(false, "UNKNOWN", emptyList()))
+                return@get
+            }
+            try {
+                val statusData = getDriverStatusFromDb(id)
+                val success = statusData["success"] as? Boolean ?: false
+                val statusStr = statusData["status"]?.toString() ?: "UNKNOWN"
+                val missingDocs = statusData["missingDocs"] as? List<String> ?: emptyList()
+                
+                call.respond(DriverStatusResponse(success, statusStr, missingDocs))
+            } catch (e: Exception) {
+                call.respond(DriverStatusResponse(false, "UNKNOWN", emptyList()))
+            }
         }
 
         route("/chat") {
@@ -896,11 +918,15 @@ private fun loginDriverInDb(email: String, pass: String): Map<String, Any>? {
             val rs = stmt.executeQuery()
             if (rs.next()) {
                 val driverId = rs.getInt("id")
+                val fullName = rs.getString("full_name") ?: "Driver"
+                val status = rs.getString("status") ?: "PENDING"
+                
                 println("DB: Driver login successful for $email, ID: $driverId")
                 
                 // Ensure driver_stats entry exists
                 try {
-                    conn.prepareStatement("INSERT INTO driver_stats (driver_id) VALUES (?) ON CONFLICT (driver_id) DO NOTHING").use { statsStmt ->
+                    val statsSql = "INSERT INTO driver_stats (driver_id) VALUES (?) ON CONFLICT (driver_id) DO NOTHING"
+                    conn.prepareStatement(statsSql).use { statsStmt ->
                         statsStmt.setInt(1, driverId)
                         statsStmt.executeUpdate()
                     }
@@ -910,8 +936,8 @@ private fun loginDriverInDb(email: String, pass: String): Map<String, Any>? {
                 
                 return mapOf(
                     "id" to driverId,
-                    "name" to rs.getString("full_name"),
-                    "status" to rs.getString("status")
+                    "name" to fullName,
+                    "status" to status
                 )
             } else {
                 println("DB: Driver login failed for $email - no match found")

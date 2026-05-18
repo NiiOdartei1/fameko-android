@@ -110,7 +110,7 @@ class DriverRepository {
                 // In a real app, we'd fetch the full driver object here
                 // For now, construct a minimal one from the auth response
                 Result.success(Driver(
-                    id = userId.toInt(),
+                    id = userId.toIntOrNull() ?: 0,
                     fullName = response.name ?: "Driver",
                     email = email,
                     phone = "",

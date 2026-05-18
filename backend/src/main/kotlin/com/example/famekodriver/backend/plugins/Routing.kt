@@ -126,6 +126,26 @@ fun Application.configureRouting() {
                 }
                 call.respondRedirect("/admin/driver/$id")
             }
+
+            get("/live-locations") {
+                val locations = getOnlineDriverLocations()
+                call.respond(locations)
+            }
+
+            get("/active-sos") {
+                val alerts = getActiveSOSAlerts()
+                call.respond(alerts)
+            }
+
+            post("/resolve-sos/{id}") {
+                val id = call.parameters["id"]?.toIntOrNull()
+                if (id != null) {
+                    resolveSOSAlert(id)
+                    call.respond(mapOf("success" to true))
+                } else {
+                    call.respond(mapOf("success" to false))
+                }
+            }
         }
 
         // Native API for mobile apps (matching Retrofit paths)
@@ -995,6 +1015,65 @@ private fun updateDriverStatus(id: String, status: String) {
         val stmt = conn.prepareStatement("UPDATE drivers SET status = ? WHERE id = ?")
         stmt.setString(1, status)
         stmt.setInt(2, id.toInt())
+        stmt.executeUpdate()
+    }
+}
+
+private fun getOnlineDriverLocations(): List<Map<String, Any>> {
+    val locations = mutableListOf<Map<String, Any>>()
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = """
+            SELECT ds.driver_id, ds.latitude, ds.longitude, d.full_name, d.vehicle_type, ds.is_online
+            FROM driver_stats ds
+            JOIN drivers d ON ds.driver_id = d.id
+            WHERE ds.is_online = true
+        """.trimIndent()
+        val stmt = conn.prepareStatement(sql)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            locations.add(mapOf(
+                "id" to rs.getInt("driver_id"),
+                "lat" to rs.getDouble("latitude"),
+                "lng" to rs.getDouble("longitude"),
+                "name" to rs.getString("full_name"),
+                "vehicle" to (rs.getString("vehicle_type") ?: "Car")
+            ))
+        }
+    }
+    return locations
+}
+
+private fun getActiveSOSAlerts(): List<Map<String, Any>> {
+    val alerts = mutableListOf<Map<String, Any>>()
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = """
+            SELECT s.*, d.full_name, d.phone 
+            FROM sos_alerts s
+            JOIN drivers d ON s.driver_id = d.id
+            WHERE s.status = 'ACTIVE'
+            ORDER BY s.created_at DESC
+        """.trimIndent()
+        val stmt = conn.prepareStatement(sql)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            alerts.add(mapOf(
+                "id" to rs.getInt("id"),
+                "driver_name" to rs.getString("full_name"),
+                "driver_phone" to rs.getString("phone"),
+                "lat" to rs.getDouble("latitude"),
+                "lng" to rs.getDouble("longitude"),
+                "time" to rs.getTimestamp("created_at").toString()
+            ))
+        }
+    }
+    return alerts
+}
+
+private fun resolveSOSAlert(id: Int) {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "UPDATE sos_alerts SET status = 'RESOLVED', resolved_at = CURRENT_TIMESTAMP WHERE id = ?"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setInt(1, id)
         stmt.executeUpdate()
     }
 }

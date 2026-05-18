@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fameko Admin - Command Center</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
             --primary-color: #004E89;
@@ -295,6 +297,92 @@
         }
 
         .user-name { font-weight: 600; font-size: 0.9rem; }
+
+        /* Map Styles */
+        #live-map {
+            height: 450px;
+            width: 100%;
+            border-radius: 16px;
+            margin-bottom: 40px;
+            box-shadow: var(--card-shadow);
+            border: 4px solid white;
+            z-index: 1;
+        }
+
+        .map-marker-label {
+            background: white;
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        /* SOS Alert Styles */
+        #sos-alert-container {
+            display: none;
+            background: #ff4d4d;
+            color: white;
+            padding: 20px 30px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(220, 53, 69, 0.4);
+            animation: pulse-red 2s infinite;
+            z-index: 1001;
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); box-shadow: 0 10px 30px rgba(220, 53, 69, 0.4); }
+            50% { transform: scale(1.01); box-shadow: 0 10px 50px rgba(220, 53, 69, 0.6); }
+            100% { transform: scale(1); box-shadow: 0 10px 30px rgba(220, 53, 69, 0.4); }
+        }
+
+        .sos-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .sos-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sos-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .sos-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sos-info b { font-size: 1.1rem; display: block; }
+        .sos-info span { font-size: 0.9rem; opacity: 0.9; }
+
+        .btn-sos-resolve {
+            background: white;
+            color: #dc3545;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-sos-resolve:hover { background: #f8f9fa; transform: scale(1.05); }
     </style>
 </head>
 <body>
@@ -314,6 +402,19 @@
     </div>
 
     <div class="main-content">
+        <div id="sos-alert-container">
+            <div class="sos-header">
+                <div class="sos-title">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    CRITICAL SAFETY ALERT - SOS ACTIVE
+                </div>
+                <button onclick="stopAlarm()" class="btn" style="background: white; color: black; font-size: 0.7rem;">Mute Alarm</button>
+            </div>
+            <div id="sos-list" class="sos-list">
+                <!-- SOS items will be injected here -->
+            </div>
+        </div>
+
         <div class="header">
             <h1>Command Center</h1>
 
@@ -350,7 +451,7 @@
                     <i class="fas fa-truck-fast"></i>
                 </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" id="pending-stat-card" style="cursor:pointer" onclick="window.location='/admin/drivers?status=PENDING'">
                 <div class="stat-info">
                     <span class="label">Pending Approvals</span>
                     <span class="value" th:text="${pendingCount}">0</span>
@@ -361,14 +462,16 @@
             </div>
             <div class="stat-card">
                 <div class="stat-info">
-                    <span class="label">Success Rate</span>
-                    <span class="value">98.4%</span>
+                    <span class="label">Active Online</span>
+                    <span class="value" id="online-drivers-count">0</span>
                 </div>
                 <div class="stat-icon icon-green">
-                    <i class="fas fa-circle-check"></i>
+                    <i class="fas fa-satellite-dish"></i>
                 </div>
             </div>
         </div>
+
+        <div id="live-map"></div>
 
         <div class="card">
             <div class="card-header">
@@ -484,5 +587,127 @@
             </div>
         </div>
     </div>
+
+    <!-- Alarm Sound -->
+    <audio id="sos-alarm" loop>
+        <source src="https://www.soundjay.com/buttons/beep-01a.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        // Initialize Live Map
+        const map = L.map('live-map').setView([5.6037, -0.1870], 12); // Accra Center
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markers = {};
+        const sosAlarm = document.getElementById('sos-alarm');
+        let isAlarmPlaying = false;
+
+        function playAlarm() {
+            if (!isAlarmPlaying) {
+                sosAlarm.play().catch(e => console.log("Autoplay blocked: ", e));
+                isAlarmPlaying = true;
+            }
+        }
+
+        function stopAlarm() {
+            sosAlarm.pause();
+            sosAlarm.currentTime = 0;
+            isAlarmPlaying = false;
+        }
+
+        function resolveSOS(id) {
+            fetch(`/admin/resolve-sos/${id}`, { method: 'POST' })
+                .then(() => updateSOSAlerts());
+        }
+
+        function updateSOSAlerts() {
+            fetch('/admin/active-sos')
+                .then(r => r.json())
+                .then(alerts => {
+                    const container = document.getElementById('sos-alert-container');
+                    const list = document.getElementById('sos-list');
+
+                    if (alerts.length > 0) {
+                        container.style.display = 'block';
+                        playAlarm();
+
+                        list.innerHTML = alerts.map(a => `
+                            <div class="sos-item">
+                                <div class="sos-info">
+                                    <b>Driver: ${a.driver_name}</b>
+                                    <span>Contact: ${a.driver_phone} | Time: ${new Date(a.time).toLocaleTimeString()}</span>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn" style="background: white; color: black;" onclick="map.setView([${a.lat}, ${a.lng}], 16)">Locate</button>
+                                    <button class="btn-sos-resolve" onclick="resolveSOS(${a.id})">Mark Resolved</button>
+                                </div>
+                            </div>
+                        `).join('');
+
+                        // Also highlight SOS drivers on map
+                        alerts.forEach(a => {
+                            if (markers[a.driver_id]) {
+                                markers[a.driver_id].bindTooltip("SOS ACTIVE", {permanent: true, className: "map-marker-label", direction: "top"}).openTooltip();
+                            }
+                        });
+                    } else {
+                        container.style.display = 'none';
+                        stopAlarm();
+                    }
+                });
+        }
+
+        function updateLiveLocations() {
+            fetch('/admin/live-locations')
+                .then(response => response.json())
+                .then(drivers => {
+                    document.getElementById('online-drivers-count').innerText = drivers.length;
+
+                    // Add/Update markers
+                    drivers.forEach(driver => {
+                        const iconHtml = `
+                            <div style="background: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); border: 2px solid #004E89;">
+                                <i class="fas fa-car" style="color: #004E89; font-size: 1.2rem;"></i>
+                            </div>
+                        `;
+
+                        const customIcon = L.divIcon({
+                            html: iconHtml,
+                            className: 'custom-div-icon',
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 20]
+                        });
+
+                        if (markers[driver.id]) {
+                            markers[driver.id].setLatLng([driver.lat, driver.lng]);
+                        } else {
+                            markers[driver.id] = L.marker([driver.lat, driver.lng], {icon: customIcon})
+                                .addTo(map)
+                                .bindPopup(`<b>${driver.name}</b><br>${driver.vehicle}`);
+                        }
+                    });
+
+                    // Remove markers for drivers who went offline
+                    const driverIds = drivers.map(d => d.id);
+                    Object.keys(markers).forEach(id => {
+                        if (!driverIds.includes(parseInt(id))) {
+                            map.removeLayer(markers[id]);
+                            delete markers[id];
+                        }
+                    });
+                })
+                .catch(err => console.error("Error fetching locations:", err));
+        }
+
+        // Initial update and intervals
+        updateLiveLocations();
+        updateSOSAlerts();
+        setInterval(updateLiveLocations, 5000);
+        setInterval(updateSOSAlerts, 3000); // Check SOS more frequently (every 3s)
+    </script>
 </body>
 </html>

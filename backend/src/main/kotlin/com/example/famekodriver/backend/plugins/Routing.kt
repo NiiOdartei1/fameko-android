@@ -191,12 +191,6 @@ fun Application.configureRouting() {
             }
         }
 
-        get("/driver/status/{id}") {
-            val id = call.parameters["id"] ?: return@get call.respond(AuthResponse(false, "Missing ID", null, null))
-            val statusData = getDriverStatusFromDb(id)
-            call.respond(statusData)
-        }
-
         get("/driver/nearby") {
             val lat = call.parameters["lat"]?.toDoubleOrNull() ?: 0.0
             val lng = call.parameters["lng"]?.toDoubleOrNull() ?: 0.0
@@ -616,17 +610,24 @@ private fun getDeliveryByOrderId(orderId: Int): Delivery? {
         stmt.setInt(1, orderId)
         val rs = stmt.executeQuery()
         if (rs.next()) {
+            val dbStatus = rs.getString("status") ?: "PENDING"
+            val deliveryStatus = try {
+                DeliveryStatus.valueOf(dbStatus.uppercase())
+            } catch (e: Exception) {
+                DeliveryStatus.PENDING
+            }
+            
             return Delivery(
-                id = rs.getString("id"),
+                id = rs.getInt("id").toString(),
                 orderId = rs.getInt("order_id"),
-                driverId = null,
+                driverId = rs.getString("driver_id"),
                 pickupLocation = rs.getString("pickup_location"),
                 dropoffLocation = rs.getString("dropoff_location"),
                 pickupLat = rs.getDouble("pickup_lat"),
                 pickupLng = rs.getDouble("pickup_lng"),
                 dropoffLat = rs.getDouble("dropoff_lat"),
                 dropoffLng = rs.getDouble("dropoff_lng"),
-                status = DeliveryStatus.PENDING,
+                status = deliveryStatus,
                 distanceKm = rs.getDouble("distance_km"),
                 estimatedEarnings = rs.getDouble("estimated_earnings")
             )
@@ -851,8 +852,16 @@ private fun loginDriverInDb(email: String, pass: String): Map<String, Any>? {
         stmt.setString(2, pass)
         val rs = stmt.executeQuery()
         if (rs.next()) {
+            val driverId = rs.getInt("id")
+            
+            // Ensure driver_stats entry exists
+            conn.prepareStatement("INSERT INTO driver_stats (driver_id) VALUES (?) ON CONFLICT (driver_id) DO NOTHING").use { statsStmt ->
+                statsStmt.setInt(1, driverId)
+                statsStmt.executeUpdate()
+            }
+            
             return mapOf(
-                "id" to rs.getInt("id"), 
+                "id" to driverId,
                 "name" to rs.getString("full_name"),
                 "status" to rs.getString("status")
             )

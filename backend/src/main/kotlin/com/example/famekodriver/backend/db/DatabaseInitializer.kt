@@ -210,6 +210,7 @@ object DatabaseInitializer {
                 route_coords TEXT,
                 distance_km DOUBLE PRECISION,
                 estimated_duration_minutes INTEGER,
+                estimated_earnings NUMERIC(12, 2) DEFAULT 0.0,
                 base_fare NUMERIC(12, 2) DEFAULT 0.0,
                 per_km_rate NUMERIC(12, 2),
                 platform_commission NUMERIC(12, 2) DEFAULT 0.0,

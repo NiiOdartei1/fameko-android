@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fameko Admin - Live Tracking Map</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --primary-color: #004E89;
+            --primary-light: #0077D3;
+            --secondary-color: #28A745;
+            --danger-color: #DC3545;
+            --warning-color: #FFC107;
+            --light-bg: #F0F2F5;
+            --dark-text: #1C1E21;
+            --sidebar-width: 260px;
+            --card-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            line-height: 1.5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: linear-gradient(180deg, var(--primary-color) 0%, #00335c 100%);
+            color: white;
+            height: 100vh;
+            position: fixed;
+            padding-top: 0;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 25px 20px;
+            background: rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .sidebar-header i { font-size: 1.5rem; }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0 15px;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            border-radius: 8px;
+            margin-bottom: 5px;
+            font-weight: 500;
+            opacity: 0.85;
+        }
+
+        .sidebar-menu li:hover {
+            background-color: rgba(255,255,255,0.15);
+            opacity: 1;
+            transform: translateX(5px);
+        }
+
+        .sidebar-menu li i {
+            margin-right: 15px;
+            width: 20px;
+            font-size: 1.1rem;
+        }
+
+        .sidebar-menu li.active {
+            background-color: white;
+            color: var(--primary-color);
+            opacity: 1;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0;
+            color: #1a1a1a;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: var(--light-bg);
+            padding: 5px 15px 5px 5px;
+            border-radius: 40px;
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-color));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+            font-size: 0.8rem;
+        }
+
+        .user-name { font-weight: 600; font-size: 0.85rem; }
+
+        /* Map Styles */
+        #live-map {
+            flex: 1;
+            width: 100%;
+            z-index: 1;
+        }
+
+        .map-marker-label {
+            background: white;
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        /* SOS Alert Styles */
+        #sos-alert-container {
+            display: none;
+            position: absolute;
+            top: 100px;
+            right: 40px;
+            width: 350px;
+            background: #ff4d4d;
+            color: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(220, 53, 69, 0.4);
+            animation: pulse-red 2s infinite;
+            z-index: 1001;
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); box-shadow: 0 10px 30px rgba(220, 53, 69, 0.4); }
+            50% { transform: scale(1.02); box-shadow: 0 10px 50px rgba(220, 53, 69, 0.6); }
+            100% { transform: scale(1); box-shadow: 0 10px 30px rgba(220, 53, 69, 0.4); }
+        }
+
+        .sos-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .sos-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sos-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .sos-item {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 12px;
+            border-radius: 10px;
+        }
+
+        .sos-info b { font-size: 1rem; display: block; }
+        .sos-info span { font-size: 0.8rem; opacity: 0.9; }
+
+        .sos-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-sos-resolve {
+            flex: 1;
+            background: white;
+            color: #dc3545;
+            border: none;
+            padding: 6px;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .map-stats-overlay {
+            position: absolute;
+            bottom: 30px;
+            left: 300px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: var(--card-shadow);
+            z-index: 1000;
+            display: flex;
+            gap: 30px;
+        }
+
+        .map-stat { display: flex; flex-direction: column; }
+        .map-stat .label { font-size: 0.7rem; color: #6c757d; font-weight: 700; text-transform: uppercase; }
+        .map-stat .value { font-size: 1.2rem; font-weight: 800; color: var(--primary-color); }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-shield-alt"></i>
+            <h2 style="margin:0; font-size: 1.4rem; letter-spacing: 1px;">FAMEKO</h2>
+        </div>
+        <ul class="sidebar-menu">
+            <li data-th-class="${activePage == 'dashboard' ? 'active' : ''}" onclick="window.location='/admin/dashboard'"><i class="fas fa-th-large"></i> Dashboard</li>
+            <li data-th-class="${activePage == 'map' ? 'active' : ''}" onclick="window.location='/admin/map'"><i class="fas fa-map-location-dot"></i> Live Map</li>
+            <li data-th-class="${activePage == 'drivers' ? 'active' : ''}" onclick="window.location='/admin/drivers'"><i class="fas fa-id-card"></i> Drivers</li>
+            <li data-th-class="${activePage == 'customers' ? 'active' : ''}" onclick="window.location='/admin/customers'"><i class="fas fa-user-group"></i> Customers</li>
+            <li data-th-class="${activePage == 'deliveries' ? 'active' : ''}" onclick="window.location='/admin/deliveries'"><i class="fas fa-route"></i> Deliveries</li>
+            <li><i class="fas fa-chart-pie"></i> Analytics</li>
+            <li data-th-class="${activePage == 'settings' ? 'active' : ''}" onclick="window.location='/admin/settings'"><i class="fas fa-gear"></i> Settings</li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Live Fleet Tracking</h1>
+
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div class="user-profile">
+                    <div class="user-avatar">A</div>
+                    <span class="user-name">Administrator</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="sos-alert-container">
+            <div class="sos-header">
+                <div class="sos-title">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    SOS ACTIVE
+                </div>
+                <button onclick="stopAlarm()" class="btn" style="background: white; color: black; font-size: 0.6rem; padding: 4px 8px; border: none; border-radius: 4px; cursor: pointer;">Mute</button>
+            </div>
+            <div id="sos-list" class="sos-list"></div>
+        </div>
+
+        <div id="live-map"></div>
+
+        <div class="map-stats-overlay">
+            <div class="map-stat">
+                <span class="label">Online Drivers</span>
+                <span class="value" id="online-drivers-count">0</span>
+            </div>
+            <div class="map-stat">
+                <span class="label">Active SOS</span>
+                <span class="value" id="active-sos-count" style="color: var(--danger-color)">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alarm Sound -->
+    <audio id="sos-alarm" loop>
+        <source src="https://www.soundjay.com/buttons/beep-01a.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const map = L.map('live-map').setView([5.6037, -0.1870], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const markers = {};
+        const sosAlarm = document.getElementById('sos-alarm');
+        let isAlarmPlaying = false;
+
+        function playAlarm() {
+            if (!isAlarmPlaying) {
+                sosAlarm.play().catch(e => console.log("Autoplay blocked"));
+                isAlarmPlaying = true;
+            }
+        }
+
+        function stopAlarm() {
+            sosAlarm.pause();
+            sosAlarm.currentTime = 0;
+            isAlarmPlaying = false;
+        }
+
+        function resolveSOS(id) {
+            fetch(`/admin/resolve-sos/${id}`, { method: 'POST' }).then(() => updateSOSAlerts());
+        }
+
+        function updateSOSAlerts() {
+            fetch('/admin/active-sos')
+                .then(r => r.json())
+                .then(alerts => {
+                    const container = document.getElementById('sos-alert-container');
+                    const list = document.getElementById('sos-list');
+                    document.getElementById('active-sos-count').innerText = alerts.length;
+
+                    if (alerts.length > 0) {
+                        container.style.display = 'block';
+                        playAlarm();
+                        list.innerHTML = alerts.map(a => `
+                            <div class="sos-item">
+                                <div class="sos-info">
+                                    <b>${a.driver_name}</b>
+                                    <span>${a.driver_phone} | ${new Date(a.time).toLocaleTimeString()}</span>
+                                </div>
+                                <div class="sos-actions">
+                                    <button class="btn-sos-resolve" style="background: white; color: black;" onclick="map.setView([${a.lat}, ${a.lng}], 16)">Locate</button>
+                                    <button class="btn-sos-resolve" onclick="resolveSOS(${a.id})">Resolve</button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        container.style.display = 'none';
+                        stopAlarm();
+                    }
+                });
+        }
+
+        function updateLiveLocations() {
+            fetch('/admin/live-locations')
+                .then(response => response.json())
+                .then(drivers => {
+                    document.getElementById('online-drivers-count').innerText = drivers.length;
+                    drivers.forEach(driver => {
+                        const iconHtml = `
+                            <div style="background: white; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); border: 2px solid #004E89;">
+                                <i class="fas fa-car" style="color: #004E89; font-size: 1.2rem;"></i>
+                            </div>
+                        `;
+                        const customIcon = L.divIcon({ html: iconHtml, className: 'custom-div-icon', iconSize: [40, 40], iconAnchor: [20, 20] });
+
+                        if (markers[driver.id]) {
+                            markers[driver.id].setLatLng([driver.lat, driver.lng]);
+                        } else {
+                            markers[driver.id] = L.marker([driver.lat, driver.lng], {icon: customIcon})
+                                .addTo(map)
+                                .bindPopup(`<b>${driver.name}</b><br>${driver.vehicle}`);
+                        }
+                    });
+                    const driverIds = drivers.map(d => d.id);
+                    Object.keys(markers).forEach(id => {
+                        if (!driverIds.includes(parseInt(id))) {
+                            map.removeLayer(markers[id]);
+                            delete markers[id];
+                        }
+                    });
+                });
+        }
+
+        updateLiveLocations();
+        updateSOSAlerts();
+        setInterval(updateLiveLocations, 5000);
+        setInterval(updateSOSAlerts, 3000);
+    </script>
+</body>
+</html>

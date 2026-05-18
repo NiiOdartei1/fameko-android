@@ -151,6 +151,7 @@
         </div>
         <ul class="sidebar-menu">
             <li th:class="${activePage == 'dashboard' ? 'active' : ''}" onclick="window.location='/admin/dashboard'"><i class="fas fa-th-large"></i> Dashboard</li>
+            <li th:class="${activePage == 'map' ? 'active' : ''}" onclick="window.location='/admin/map'"><i class="fas fa-map-location-dot"></i> Live Map</li>
             <li th:class="${activePage == 'drivers' ? 'active' : ''}" onclick="window.location='/admin/drivers'"><i class="fas fa-id-card"></i> Drivers</li>
             <li th:class="${activePage == 'customers' ? 'active' : ''}" onclick="window.location='/admin/customers'"><i class="fas fa-user-group"></i> Customers</li>
             <li th:class="${activePage == 'deliveries' ? 'active' : ''}" onclick="window.location='/admin/deliveries'"><i class="fas fa-route"></i> Deliveries</li>

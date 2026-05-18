@@ -120,10 +120,12 @@ object DatabaseInitializer {
                 name TEXT NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 phone TEXT NOT NULL,
+                region TEXT,
                 password TEXT NOT NULL,
                 default_address TEXT,
                 default_latitude DOUBLE PRECISION,
                 default_longitude DOUBLE PRECISION,
+                profile_picture TEXT,
                 is_active BOOLEAN DEFAULT TRUE,
                 date_joined TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )

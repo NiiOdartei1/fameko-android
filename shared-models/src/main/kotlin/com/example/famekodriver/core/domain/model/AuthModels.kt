@@ -5,7 +5,9 @@ data class CustomerRegisterRequest(
     val email: String,
     val phone: String,
     val address: String,
-    val password: String
+    val password: String,
+    val region: String? = null,
+    val profilePicture: String? = null
 )
 
 data class LoginRequest(

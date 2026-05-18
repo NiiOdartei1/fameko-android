@@ -292,9 +292,9 @@ class DriverRepository {
     /**
      * Register a new customer
      */
-    suspend fun customerRegister(name: String, email: String, phone: String, address: String, password: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun customerRegister(name: String, email: String, phone: String, address: String, password: String, region: String? = null, profilePicture: String? = null): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val request = CustomerRegisterRequest(name, email, phone, address, password)
+            val request = CustomerRegisterRequest(name, email, phone, address, password, region, profilePicture)
             val response = NetworkClient.famekoApi.registerCustomer(request)
             if (response.success) {
                 Result.success(Unit)
@@ -311,13 +311,14 @@ class DriverRepository {
                     DatabaseConfig.DB_USER,
                     DatabaseConfig.DB_PASS,
                 ).use { connection ->
-                    val query = "INSERT INTO customers (name, email, phone, default_address, password) VALUES (?, ?, ?, ?, ?)"
+                    val query = "INSERT INTO customers (name, email, phone, default_address, password, profile_picture) VALUES (?, ?, ?, ?, ?, ?)"
                     connection.prepareStatement(query).use { stmt ->
                         stmt.setString(1, name)
                         stmt.setString(2, email)
                         stmt.setString(3, phone)
                         stmt.setString(4, address)
                         stmt.setString(5, password)
+                        stmt.setString(6, null) // profile_picture
                         stmt.executeUpdate()
                     }
                     Result.success(Unit)

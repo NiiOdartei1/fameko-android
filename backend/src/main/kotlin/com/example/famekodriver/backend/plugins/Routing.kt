@@ -37,11 +37,19 @@ fun Application.configureRouting() {
                 val drivers = getAllDrivers()
                 val deliveries = getAllDeliveries()
                 val pendingCount = drivers.count { it["status"] == "PENDING" }
+                val onlineCount = getOnlineDriverLocations().size
                 call.respond(ThymeleafContent("admin_dashboard", mapOf(
                     "drivers" to drivers,
                     "deliveries" to deliveries,
                     "pendingCount" to pendingCount,
+                    "onlineCount" to onlineCount,
                     "activePage" to "dashboard"
+                )))
+            }
+
+            get("/map") {
+                call.respond(ThymeleafContent("admin_map", mapOf(
+                    "activePage" to "map"
                 )))
             }
 
@@ -814,13 +822,15 @@ private fun getWalletTransactions(driverId: Int): List<Map<String, Any>> {
 private fun registerCustomerInDb(req: CustomerRegisterRequest): Int? {
     var userId: Int? = null
     DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = "INSERT INTO customers (name, email, phone, password, default_address) VALUES (?, ?, ?, ?, ?)"
+        val sql = "INSERT INTO customers (name, email, phone, password, default_address, profile_picture, region) VALUES (?, ?, ?, ?, ?, ?, ?)"
         val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
         stmt.setString(1, req.name)
         stmt.setString(2, req.email)
         stmt.setString(3, req.phone)
         stmt.setString(4, req.password) // In real app, hash this
         stmt.setString(5, req.address)
+        stmt.setString(6, req.profilePicture)
+        stmt.setString(7, req.region)
         stmt.executeUpdate()
         val rs = stmt.generatedKeys
         if (rs.next()) {
@@ -1042,6 +1052,8 @@ private fun getAllCustomers(): List<Map<String, Any>> {
                 "name" to rs.getString("name"),
                 "email" to rs.getString("email"),
                 "phone" to (rs.getString("phone") ?: ""),
+                "region" to (rs.getString("region") ?: ""),
+                "profile_pic" to (rs.getString("profile_picture") ?: ""),
                 "is_active" to rs.getBoolean("is_active"),
                 "date_joined" to rs.getTimestamp("date_joined").toString()
             ))

@@ -490,41 +490,61 @@ private fun findNearbyDrivers(lat: Double, lng: Double, radiusKm: Double, limit:
     val drivers = mutableListOf<Int>()
     try {
         DatabaseInitializer.getDataSource().connection.use { conn ->
-            val isH2 = conn.metaData.databaseProductName.contains("H2", ignoreCase = true)
-            
-            val sql = if (isH2) {
-                // Simplified query for H2 (no spatial index)
-                "SELECT driver_id FROM driver_stats WHERE is_online = true LIMIT ?"
-            } else {
-                """
+            // Try PostGIS first
+            val spatialSql = """
                 SELECT driver_id 
                 FROM driver_stats 
                 WHERE is_online = true 
                 AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
                 ORDER BY ST_Distance(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography)
                 LIMIT ?
-                """.trimIndent()
-            }
+            """.trimIndent()
             
-            val stmt = conn.prepareStatement(sql)
-            if (isH2) {
-                stmt.setInt(1, limit)
-            } else {
+            try {
+                val stmt = conn.prepareStatement(spatialSql)
                 stmt.setDouble(1, lng)
                 stmt.setDouble(2, lat)
                 stmt.setDouble(3, radiusKm * 1000)
                 stmt.setDouble(4, lng)
                 stmt.setDouble(5, lat)
                 stmt.setInt(6, limit)
-            }
-            
-            val rs = stmt.executeQuery()
-            while (rs.next()) {
-                drivers.add(rs.getInt("driver_id"))
+                
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    drivers.add(rs.getInt("driver_id"))
+                }
+            } catch (spatialError: Exception) {
+                // Fallback to simple Haversine math if PostGIS is not available
+                println("PostGIS not available, falling back to simple math search: ${spatialError.message}")
+                val fallbackSql = """
+                    SELECT driver_id, 
+                    (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance
+                    FROM driver_stats
+                    WHERE is_online = true
+                    AND (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) < ?
+                    ORDER BY distance
+                    LIMIT ?
+                """.trimIndent()
+                
+                val stmt = conn.prepareStatement(fallbackSql)
+                stmt.setDouble(1, lat)
+                stmt.setDouble(2, lng)
+                stmt.setDouble(3, lat)
+                stmt.setDouble(4, lat)
+                stmt.setDouble(5, lng)
+                stmt.setDouble(6, lat)
+                stmt.setDouble(7, radiusKm)
+                stmt.setInt(8, limit)
+                
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    drivers.add(rs.getInt("driver_id"))
+                }
             }
         }
     } catch (e: Exception) {
         println("Error finding nearby drivers: ${e.message}")
+        e.printStackTrace()
     }
     return drivers
 }

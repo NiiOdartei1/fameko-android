@@ -1,34 +1,22 @@
 package com.example.famekodriver.core.network
 
 /**
- * Configuration for the PostgreSQL database.
- * Toggle between local and production by modifying these values.
+ * Configuration for the PostgreSQL database hosted on Render.
  */
 object DatabaseConfig {
-    // Environment variables with fallbacks
-    val USE_STANDALONE_DB = System.getenv("USE_STANDALONE_DB")?.toBoolean() ?: true
-
-    // Remote Database configuration
-    val DB_URL = System.getenv("DB_URL") ?: "jdbc:postgresql://switchyard.proxy.rlwy.net:26106/railway?ssl=true&sslmode=require"
-    val DB_USER = System.getenv("DB_USER") ?: "postgres"
-    val DB_PASS = System.getenv("DB_PASS") ?: "FQyDXSzYQfzSBTgnqxgOzWaSrQSAhLXa"
+    // Remote Database configuration from Render
+    const val DB_HOST = "dpg-d84hg6t7vvec73f9hfig-a.oregon-postgres.render.com"
+    const val DB_PORT = 5432
+    const val DB_NAME = "fameko_db_gw9b"
+    const val DB_USER = "fameko_db_gw9b_user"
+    const val DB_PASS = "fFLDwaaBQSPOf2I5KR3Y8ZGtLtzc84PM"
 
     fun getJdbcUrl(): String {
-        return if (USE_STANDALONE_DB) {
-            // Check if we are running on Android
-            val isAndroid = try { System.getProperty("java.vendor")?.contains("Android") == true } catch (e: Exception) { false }
-            
-            if (isAndroid) {
-                "" 
-            } else {
-                "jdbc:h2:./fameko;MODE=PostgreSQL;AUTO_SERVER=TRUE"
-            }
-        } else {
-            DB_URL
-        }
+        // Render requires SSL for external connections
+        return "jdbc:postgresql://$DB_HOST:$DB_PORT/$DB_NAME?ssl=true"
     }
 
     fun getDriverClassName(): String {
-        return if (USE_STANDALONE_DB) "org.h2.Driver" else "org.postgresql.Driver"
+        return "org.postgresql.Driver"
     }
 }

@@ -11,32 +11,34 @@ object DatabaseInitializer {
 
     fun init(): DataSource {
         if (dataSource == null) {
-            println("Initializing database connection...")
+            println("Initializing Render PostgreSQL connection...")
             try {
-                Class.forName(DatabaseConfig.getDriverClassName())
+                Class.forName("org.postgresql.Driver")
                 val config = HikariConfig().apply {
                     jdbcUrl = DatabaseConfig.getJdbcUrl()
                     username = DatabaseConfig.DB_USER
                     password = DatabaseConfig.DB_PASS
-                    driverClassName = DatabaseConfig.getDriverClassName()
+                    driverClassName = "org.postgresql.Driver"
                     
-                    // Connection pool settings
-                    maximumPoolSize = 10
+                    maximumPoolSize = 5 // Low pool size for free tier
                     isAutoCommit = true
                     validate()
                 }
                 dataSource = HikariDataSource(config)
                 
-                // Only run migrations/setup if the database is not yet initialized
                 dataSource!!.connection.use { conn ->
-                    if (!isAlreadyInitialized(conn)) {
-                        println("Database not initialized. Creating tables and seeding data...")
-                        createTables(conn)
-                        seedAdmin(conn)
-                        println("Database initialization completed successfully.")
-                    } else {
-                        println("Database already initialized. Skipping table creation.")
+                    // Try to enable PostGIS but don't crash if it fails
+                    try {
+                        conn.createStatement().execute("CREATE EXTENSION IF NOT EXISTS postgis;")
+                        println("PostGIS extension checked/enabled.")
+                    } catch (e: Exception) {
+                        println("Warning: Could not enable PostGIS extension: ${e.message}")
                     }
+
+                    println("Setting up database tables...")
+                    createTables(conn)
+                    seedAdmin(conn)
+                    println("Render PostgreSQL setup complete.")
                 }
             } catch (e: Exception) {
                 println("Database initialization failed!")

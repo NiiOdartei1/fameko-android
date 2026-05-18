@@ -32,7 +32,6 @@ dependencies {
     api(libs.androidx.core.ktx)
     api(libs.androidx.appcompat)
     api("org.postgresql:postgresql:42.2.27")
-    api("com.h2database:h2:2.2.224")
     api(libs.kotlinx.coroutines.android)
     
     // Networking

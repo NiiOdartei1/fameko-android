@@ -24,7 +24,6 @@ dependencies {
     implementation(libs.hikaricp)
     
     implementation("org.postgresql:postgresql:42.7.2")
-    implementation("com.h2database:h2:2.2.224")
 }
 
 kotlin {

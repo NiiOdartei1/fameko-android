@@ -497,22 +497,36 @@ class DriverRepository {
                 DatabaseConfig.DB_USER,
                 DatabaseConfig.DB_PASS,
             ).use { connection ->
-                val query = """
+                // Try updating with PostGIS point first
+                val spatialQuery = """
                     UPDATE driver_stats 
                     SET latitude = ?, longitude = ?, bearing = ?, 
                         location = ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography 
                     WHERE driver_id = ?
                 """.trimIndent()
-                connection.prepareStatement(query).use { stmt ->
-                    stmt.setDouble(1, lat)
-                    stmt.setDouble(2, lng)
-                    stmt.setFloat(3, bearing)
-                    stmt.setDouble(4, lng) // Longitude first for ST_MakePoint
-                    stmt.setDouble(5, lat)
-                    stmt.setString(6, driverId)
-                    stmt.executeUpdate()
-                    Result.success(Unit)
+                
+                try {
+                    connection.prepareStatement(spatialQuery).use { stmt ->
+                        stmt.setDouble(1, lat)
+                        stmt.setDouble(2, lng)
+                        stmt.setFloat(3, bearing)
+                        stmt.setDouble(4, lng)
+                        stmt.setDouble(5, lat)
+                        stmt.setString(6, driverId)
+                        stmt.executeUpdate()
+                    }
+                } catch (spatialError: Exception) {
+                    // Fallback to simple latitude/longitude update if PostGIS extension is missing
+                    val basicQuery = "UPDATE driver_stats SET latitude = ?, longitude = ?, bearing = ? WHERE driver_id = ?"
+                    connection.prepareStatement(basicQuery).use { stmt ->
+                        stmt.setDouble(1, lat)
+                        stmt.setDouble(2, lng)
+                        stmt.setFloat(3, bearing)
+                        stmt.setString(4, driverId)
+                        stmt.executeUpdate()
+                    }
                 }
+                Result.success(Unit)
             }
         } catch (_: Exception) {
             Result.failure(Exception("Failed to update location"))

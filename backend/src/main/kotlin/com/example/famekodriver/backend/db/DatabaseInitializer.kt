@@ -37,6 +37,7 @@ object DatabaseInitializer {
 
                     println("Setting up database tables...")
                     createTables(conn)
+                    migrateTables(conn) // Add migration
                     seedAdmin(conn)
                     println("Render PostgreSQL setup complete.")
                 }
@@ -62,6 +63,23 @@ object DatabaseInitializer {
             }
         } catch (e: Exception) {
             false
+        }
+    }
+
+    private fun migrateTables(conn: Connection) {
+        val migrations = listOf(
+            "ALTER TABLE customers ADD COLUMN IF NOT EXISTS region TEXT;",
+            "ALTER TABLE customers ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
+            "ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS estimated_earnings NUMERIC(12, 2) DEFAULT 0.0;"
+        )
+        conn.createStatement().use { stmt ->
+            migrations.forEach { sql ->
+                try {
+                    stmt.execute(sql)
+                } catch (e: Exception) {
+                    println("Migration skipped: ${e.message}")
+                }
+            }
         }
     }
 

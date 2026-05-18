@@ -311,14 +311,15 @@ class DriverRepository {
                     DatabaseConfig.DB_USER,
                     DatabaseConfig.DB_PASS,
                 ).use { connection ->
-                    val query = "INSERT INTO customers (name, email, phone, default_address, password, profile_picture) VALUES (?, ?, ?, ?, ?, ?)"
+                    val query = "INSERT INTO customers (name, email, phone, default_address, password, region, profile_picture) VALUES (?, ?, ?, ?, ?, ?, ?)"
                     connection.prepareStatement(query).use { stmt ->
                         stmt.setString(1, name)
                         stmt.setString(2, email)
                         stmt.setString(3, phone)
                         stmt.setString(4, address)
                         stmt.setString(5, password)
-                        stmt.setString(6, null) // profile_picture
+                        stmt.setString(6, region)
+                        stmt.setString(7, profilePicture)
                         stmt.executeUpdate()
                     }
                     Result.success(Unit)

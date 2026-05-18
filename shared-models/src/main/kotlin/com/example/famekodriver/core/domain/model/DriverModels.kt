@@ -33,3 +33,9 @@ data class WalletTransaction(
     val status: String,
     val createdAt: String
 )
+
+data class DriverStatusResponse(
+    val success: Boolean,
+    val status: String, // "PENDING", "APPROVED", "REJECTED"
+    val missingDocs: List<String>
+)

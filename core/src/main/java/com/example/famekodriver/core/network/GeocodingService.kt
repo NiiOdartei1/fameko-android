@@ -127,33 +127,3 @@ interface FamekoApiService {
         @Query("radius") radius: Double = 5.0
     ): List<DriverLocation>
 }
-
-data class OrderCreateRequest(
-    val customerId: String,
-    val pickupLocation: String,
-    val dropoffLocation: String,
-    val pickupLat: Double,
-    val pickupLng: Double,
-    val dropoffLat: Double,
-    val dropoffLng: Double,
-    val distanceKm: Double,
-    val estimatedFare: Double,
-    val durationMin: Double
-)
-
-data class OrderStatusResponse(
-    val success: Boolean,
-    val status: String,
-    val driverName: String? = null,
-    val driverPhone: String? = null,
-    val driverVehicle: String? = null,
-    val driverLat: Double? = null,
-    val driverLng: Double? = null,
-    val driverRating: Double? = null
-)
-
-data class DriverStatusResponse(
-    val success: Boolean,
-    val status: String, // "PENDING", "APPROVED", "REJECTED"
-    val missingDocs: List<String>
-)

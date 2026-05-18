@@ -25,3 +25,27 @@ data class OrderItem(
     val totalPrice: Double,
     val status: String
 )
+
+data class OrderCreateRequest(
+    val customerId: String,
+    val pickupLocation: String,
+    val dropoffLocation: String,
+    val pickupLat: Double,
+    val pickupLng: Double,
+    val dropoffLat: Double,
+    val dropoffLng: Double,
+    val distanceKm: Double,
+    val estimatedFare: Double,
+    val durationMin: Double
+)
+
+data class OrderStatusResponse(
+    val success: Boolean,
+    val status: String,
+    val driverName: String? = null,
+    val driverPhone: String? = null,
+    val driverVehicle: String? = null,
+    val driverLat: Double? = null,
+    val driverLng: Double? = null,
+    val driverRating: Double? = null
+)

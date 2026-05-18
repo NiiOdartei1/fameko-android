@@ -886,67 +886,88 @@ private fun loginCustomerInDb(email: String, pass: String): Map<String, Any>? {
 }
 
 private fun loginDriverInDb(email: String, pass: String): Map<String, Any>? {
-    DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = "SELECT id, full_name, status FROM drivers WHERE email = ? AND password = ?"
-        val stmt = conn.prepareStatement(sql)
-        stmt.setString(1, email)
-        stmt.setString(2, pass)
-        val rs = stmt.executeQuery()
-        if (rs.next()) {
-            val driverId = rs.getInt("id")
-            
-            // Ensure driver_stats entry exists
-            conn.prepareStatement("INSERT INTO driver_stats (driver_id) VALUES (?) ON CONFLICT (driver_id) DO NOTHING").use { statsStmt ->
-                statsStmt.setInt(1, driverId)
-                statsStmt.executeUpdate()
+    println("DB: Attempting driver login for $email")
+    try {
+        DatabaseInitializer.getDataSource().connection.use { conn ->
+            val sql = "SELECT id, full_name, status FROM drivers WHERE email = ? AND password = ?"
+            val stmt = conn.prepareStatement(sql)
+            stmt.setString(1, email)
+            stmt.setString(2, pass)
+            val rs = stmt.executeQuery()
+            if (rs.next()) {
+                val driverId = rs.getInt("id")
+                println("DB: Driver login successful for $email, ID: $driverId")
+                
+                // Ensure driver_stats entry exists
+                try {
+                    conn.prepareStatement("INSERT INTO driver_stats (driver_id) VALUES (?) ON CONFLICT (driver_id) DO NOTHING").use { statsStmt ->
+                        statsStmt.setInt(1, driverId)
+                        statsStmt.executeUpdate()
+                    }
+                } catch (statsErr: Exception) {
+                    println("DB: Warning - could not ensure driver_stats for $driverId: ${statsErr.message}")
+                }
+                
+                return mapOf(
+                    "id" to driverId,
+                    "name" to rs.getString("full_name"),
+                    "status" to rs.getString("status")
+                )
+            } else {
+                println("DB: Driver login failed for $email - no match found")
             }
-            
-            return mapOf(
-                "id" to driverId,
-                "name" to rs.getString("full_name"),
-                "status" to rs.getString("status")
-            )
         }
+    } catch (e: Exception) {
+        println("DB: Driver login error for $email: ${e.message}")
+        e.printStackTrace()
     }
     return null
 }
 
 private fun registerDriverInDb(data: Map<String, String>): Int? {
     var driverId: Int? = null
-    DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = """
-            INSERT INTO drivers (
-                full_name, email, phone, region, password,
-                license_number, vehicle_type, vehicle_number, service_types,
-                profile_picture, license_image, id_front_image, id_back_image, vehicle_image, status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """.trimIndent()
-        
-        val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
-        stmt.setString(1, data["full_name"])
-        stmt.setString(2, data["email"])
-        stmt.setString(3, data["phone"])
-        stmt.setString(4, data["region"])
-        stmt.setString(5, data["password"])
-        stmt.setString(6, data["license_number"])
-        stmt.setString(7, data["vehicle_type"])
-        stmt.setString(8, data["vehicle_number"])
-        stmt.setString(9, data["service_type"] ?: "both")
-        stmt.setString(10, data["profile_pic"] ?: "")
-        stmt.setString(11, data["drivers_license"] ?: "")
-        stmt.setString(12, data["ghana_card"] ?: "") // id_front_image
-        stmt.setString(13, "") // id_back_image placeholder
-        stmt.setString(14, "") // vehicle_image placeholder
-        
-        // If all docs are missing, mark as PENDING_DOCS
-        val hasDocs = data.containsKey("profile_pic") || data.containsKey("drivers_license")
-        stmt.setString(15, if (hasDocs) "PENDING" else "PENDING_DOCS")
-        
-        stmt.executeUpdate()
-        val rs = stmt.generatedKeys
-        if (rs.next()) {
-            driverId = rs.getInt(1)
+    println("DB: Registering driver ${data["email"]}")
+    try {
+        DatabaseInitializer.getDataSource().connection.use { conn ->
+            val sql = """
+                INSERT INTO drivers (
+                    full_name, email, phone, region, password,
+                    license_number, vehicle_type, vehicle_number, service_types,
+                    profile_picture, license_image, id_front_image, id_back_image, vehicle_image, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+            """.trimIndent()
+            
+            val stmt = conn.prepareStatement(sql)
+            stmt.setString(1, data["full_name"])
+            stmt.setString(2, data["email"])
+            stmt.setString(3, data["phone"])
+            stmt.setString(4, data["region"])
+            stmt.setString(5, data["password"])
+            stmt.setString(6, data["license_number"])
+            stmt.setString(7, data["vehicle_type"])
+            stmt.setString(8, data["vehicle_number"])
+            stmt.setString(9, data["service_type"] ?: "both")
+            stmt.setString(10, data["profile_pic"] ?: "")
+            stmt.setString(11, data["drivers_license"] ?: "")
+            stmt.setString(12, data["ghana_card"] ?: "") // id_front_image
+            stmt.setString(13, "") // id_back_image placeholder
+            stmt.setString(14, "") // vehicle_image placeholder
+            
+            // If all docs are missing, mark as PENDING_DOCS
+            val hasDocs = data.containsKey("profile_pic") || data.containsKey("drivers_license")
+            stmt.setString(15, if (hasDocs) "PENDING" else "PENDING_DOCS")
+            
+            val rs = stmt.executeQuery()
+            if (rs.next()) {
+                driverId = rs.getInt(1)
+                println("DB: Driver registered with ID: $driverId")
+            } else {
+                println("DB: No ID returned after driver insertion")
+            }
         }
+    } catch (e: Exception) {
+        println("DB: Driver registration error: ${e.message}")
+        e.printStackTrace()
     }
     return driverId
 }

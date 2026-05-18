@@ -417,19 +417,21 @@ fun CustomerMapScreen() {
                                                 val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
                                                 @SuppressLint("MissingPermission")
                                                 fusedLocationClient.lastLocation.addOnSuccessListener { deviceLocation ->
-                                                    deviceLocation?.let { loc ->
+                                                    if (deviceLocation != null) {
                                                         scope.launch {
-                                                            repository.reverseGeocode(loc.latitude, loc.longitude).onSuccess { suggestion ->
+                                                            repository.reverseGeocode(deviceLocation.latitude, deviceLocation.longitude).onSuccess { suggestion ->
                                                                 pickupLocation = suggestion.displayName
-                                                                pickupGeoPoint = GeoPoint(loc.latitude, loc.longitude)
+                                                                pickupGeoPoint = GeoPoint(deviceLocation.latitude, deviceLocation.longitude)
                                                             }.onFailure {
                                                                 pickupLocation = "My Location"
-                                                                pickupGeoPoint = GeoPoint(loc.latitude, loc.longitude)
+                                                                pickupGeoPoint = GeoPoint(deviceLocation.latitude, deviceLocation.longitude)
                                                             }
                                                             pickupSuggestions = emptyList()
                                                             isPickupFocused = false
                                                             focusManager.clearFocus()
                                                         }
+                                                    } else {
+                                                        Toast.makeText(context, "Locating your position, please try again in a moment...", Toast.LENGTH_SHORT).show()
                                                     }
                                                 }
                                             } else {

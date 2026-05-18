@@ -488,70 +488,95 @@ data class OrderCreateRequest(
 
 private fun findNearbyDrivers(lat: Double, lng: Double, radiusKm: Double, limit: Int): List<Int> {
     val drivers = mutableListOf<Int>()
-    DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = """
-            SELECT driver_id 
-            FROM driver_stats 
-            WHERE is_online = true 
-            AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
-            ORDER BY ST_Distance(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography)
-            LIMIT ?
-        """.trimIndent()
-        
-        val stmt = conn.prepareStatement(sql)
-        stmt.setDouble(1, lng) // Longitude first for ST_MakePoint
-        stmt.setDouble(2, lat)
-        stmt.setDouble(3, radiusKm * 1000) // ST_DWithin uses meters for geography
-        stmt.setDouble(4, lng)
-        stmt.setDouble(5, lat)
-        stmt.setInt(6, limit)
-        
-        val rs = stmt.executeQuery()
-        while (rs.next()) {
-            drivers.add(rs.getInt("driver_id"))
+    try {
+        DatabaseInitializer.getDataSource().connection.use { conn ->
+            val isH2 = conn.metaData.databaseProductName.contains("H2", ignoreCase = true)
+            
+            val sql = if (isH2) {
+                // Simplified query for H2 (no spatial index)
+                "SELECT driver_id FROM driver_stats WHERE is_online = true LIMIT ?"
+            } else {
+                """
+                SELECT driver_id 
+                FROM driver_stats 
+                WHERE is_online = true 
+                AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
+                ORDER BY ST_Distance(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography)
+                LIMIT ?
+                """.trimIndent()
+            }
+            
+            val stmt = conn.prepareStatement(sql)
+            if (isH2) {
+                stmt.setInt(1, limit)
+            } else {
+                stmt.setDouble(1, lng)
+                stmt.setDouble(2, lat)
+                stmt.setDouble(3, radiusKm * 1000)
+                stmt.setDouble(4, lng)
+                stmt.setDouble(5, lat)
+                stmt.setInt(6, limit)
+            }
+            
+            val rs = stmt.executeQuery()
+            while (rs.next()) {
+                drivers.add(rs.getInt("driver_id"))
+            }
         }
+    } catch (e: Exception) {
+        println("Error finding nearby drivers: ${e.message}")
     }
     return drivers
 }
 
 private fun createOrderAndDelivery(req: OrderCreateRequest): Int? {
-    DatabaseInitializer.getDataSource().connection.use { conn ->
-        conn.autoCommit = false
-        try {
-            val orderSql = "INSERT INTO orders (customer_id, total_amount, shipping_name, shipping_address, shipping_phone) VALUES (?, ?, ?, ?, ?) RETURNING id"
-            val oStmt = conn.prepareStatement(orderSql)
-            oStmt.setInt(1, req.customerId.toInt())
-            oStmt.setDouble(2, req.estimatedFare)
-            oStmt.setString(3, "Customer") // Placeholder
-            oStmt.setString(4, req.dropoffLocation)
-            oStmt.setString(5, "0000000000") // Placeholder
-            val oRs = oStmt.executeQuery()
-            if (!oRs.next()) return null
-            val orderId = oRs.getInt(1)
+    try {
+        DatabaseInitializer.getDataSource().connection.use { conn ->
+            conn.autoCommit = false
+            try {
+                val orderSql = "INSERT INTO orders (customer_id, total_amount, shipping_name, shipping_address, shipping_phone, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                val oStmt = conn.prepareStatement(orderSql, java.sql.Statement.RETURN_GENERATED_KEYS)
+                oStmt.setInt(1, req.customerId.toInt())
+                oStmt.setDouble(2, req.estimatedFare)
+                oStmt.setString(3, "Customer")
+                oStmt.setString(4, req.pickupLocation) // Using pickup as shipping address
+                oStmt.setString(5, "0000000000")
+                oStmt.setDouble(6, req.pickupLat)
+                oStmt.setDouble(7, req.pickupLng)
+                
+                oStmt.executeUpdate()
+                val oRs = oStmt.generatedKeys
+                if (!oRs.next()) return null
+                val orderId = oRs.getInt(1)
 
-            val deliverySql = """
-                INSERT INTO deliveries (order_id, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, estimated_duration_minutes, estimated_earnings, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
-            """.trimIndent()
-            val dStmt = conn.prepareStatement(deliverySql)
-            dStmt.setInt(1, orderId)
-            dStmt.setString(2, req.pickupLocation)
-            dStmt.setString(3, req.dropoffLocation)
-            dStmt.setDouble(4, req.pickupLat)
-            dStmt.setDouble(5, req.pickupLng)
-            dStmt.setDouble(6, req.dropoffLat)
-            dStmt.setDouble(7, req.dropoffLng)
-            dStmt.setDouble(8, req.distanceKm)
-            dStmt.setInt(9, req.durationMin.toInt())
-            dStmt.setDouble(10, req.estimatedFare * 0.8)
-            dStmt.executeUpdate()
+                val deliverySql = """
+                    INSERT INTO deliveries (order_id, pickup_location, dropoff_location, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, distance_km, estimated_duration_minutes, estimated_earnings, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
+                """.trimIndent()
+                val dStmt = conn.prepareStatement(deliverySql)
+                dStmt.setInt(1, orderId)
+                dStmt.setString(2, req.pickupLocation)
+                dStmt.setString(3, req.dropoffLocation)
+                dStmt.setDouble(4, req.pickupLat)
+                dStmt.setDouble(5, req.pickupLng)
+                dStmt.setDouble(6, req.dropoffLat)
+                dStmt.setDouble(7, req.dropoffLng)
+                dStmt.setDouble(8, req.distanceKm)
+                dStmt.setInt(9, req.durationMin.toInt())
+                dStmt.setDouble(10, req.estimatedFare * 0.8)
+                dStmt.executeUpdate()
 
-            conn.commit()
-            return orderId
-        } catch (e: Exception) {
-            conn.rollback()
-            throw e
+                conn.commit()
+                return orderId
+            } catch (e: Exception) {
+                conn.rollback()
+                println("Database error in createOrderAndDelivery: ${e.message}")
+                throw e
+            }
         }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
     }
 }
 

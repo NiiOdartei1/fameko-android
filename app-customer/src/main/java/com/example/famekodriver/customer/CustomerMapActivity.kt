@@ -601,11 +601,20 @@ fun CustomerMapScreen() {
                         onClick = { 
                             isOrderPlacing = true
                             scope.launch {
-                                val customerId = sessionManager.getDriverId() ?: "1" // Reusing driverId key for customer id in shared SessionManager
-                                val multiplier = when(selectedVehicleType) { "Comfort" -> 1.3; "Bike" -> 0.7; else -> 1.0 }
-                                repository.createOrder(customerId, pickupLocation, dropoffLocation, pickupGeoPoint!!.latitude, pickupGeoPoint!!.longitude, dropoffGeoPoint!!.latitude, dropoffGeoPoint!!.longitude, distanceKm, estimatedFare!! * multiplier, durationMin).onSuccess { id ->
+                                // Reusing driverId key for customer id in shared SessionManager
+                                val id = sessionManager.getDriverId() 
+                                if (id == null) {
                                     isOrderPlacing = false
-                                    currentOrderId = id.toIntOrNull()
+                                    Toast.makeText(context, "Please log in again", Toast.LENGTH_SHORT).show()
+                                    return@launch
+                                }
+                                
+                                val multiplier = when(selectedVehicleType) { "Comfort" -> 1.3; "Bike" -> 0.7; else -> 1.0 }
+                                repository.createOrder(id, pickupLocation, dropoffLocation, pickupGeoPoint!!.latitude, pickupGeoPoint!!.longitude, dropoffGeoPoint!!.latitude, dropoffGeoPoint!!.longitude, distanceKm, estimatedFare!! * multiplier, durationMin).onSuccess { orderId ->
+                                    isOrderPlacing = false
+                                    currentOrderId = orderId.toIntOrNull()
+                                    // Initialize status immediately so overlay appears without delay
+                                    orderStatusData = OrderStatusResponse(success = true, status = "PENDING")
                                 }.onFailure { e ->
                                     isOrderPlacing = false
                                     Toast.makeText(context, "Failed: ${e.message}", Toast.LENGTH_LONG).show()

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -392,12 +392,12 @@
             <h2 style="margin:0; font-size: 1.4rem; letter-spacing: 1px;">FAMEKO</h2>
         </div>
         <ul class="sidebar-menu">
-            <li th:class="${activePage == 'dashboard' ? 'active' : ''}" onclick="window.location='/admin/dashboard'"><i class="fas fa-th-large"></i> Dashboard</li>
-            <li th:class="${activePage == 'drivers' ? 'active' : ''}" onclick="window.location='/admin/drivers'"><i class="fas fa-id-card"></i> Drivers</li>
-            <li th:class="${activePage == 'customers' ? 'active' : ''}" onclick="window.location='/admin/customers'"><i class="fas fa-user-group"></i> Customers</li>
-            <li th:class="${activePage == 'deliveries' ? 'active' : ''}" onclick="window.location='/admin/deliveries'"><i class="fas fa-route"></i> Deliveries</li>
+            <li data-th-class="${activePage == 'dashboard' ? 'active' : ''}" onclick="window.location='/admin/dashboard'"><i class="fas fa-th-large"></i> Dashboard</li>
+            <li data-th-class="${activePage == 'drivers' ? 'active' : ''}" onclick="window.location='/admin/drivers'"><i class="fas fa-id-card"></i> Drivers</li>
+            <li data-th-class="${activePage == 'customers' ? 'active' : ''}" onclick="window.location='/admin/customers'"><i class="fas fa-user-group"></i> Customers</li>
+            <li data-th-class="${activePage == 'deliveries' ? 'active' : ''}" onclick="window.location='/admin/deliveries'"><i class="fas fa-route"></i> Deliveries</li>
             <li><i class="fas fa-chart-pie"></i> Analytics</li>
-            <li th:class="${activePage == 'settings' ? 'active' : ''}" onclick="window.location='/admin/settings'"><i class="fas fa-gear"></i> Settings</li>
+            <li data-th-class="${activePage == 'settings' ? 'active' : ''}" onclick="window.location='/admin/settings'"><i class="fas fa-gear"></i> Settings</li>
         </ul>
     </div>
 
@@ -421,7 +421,7 @@
             <div style="display: flex; gap: 20px; align-items: center;">
                 <div class="search-bar">
                     <i class="fas fa-search" style="color: #adb5bd"></i>
-                    <input type="text" placeholder="Search drivers, orders, or customers...">
+                    <input type="text" placeholder="Search drivers, orders, or customers..." aria-label="Search">
                 </div>
 
                 <div class="user-profile">
@@ -436,7 +436,7 @@
             <div class="stat-card">
                 <div class="stat-info">
                     <span class="label">Total Drivers</span>
-                    <span class="value" th:text="${#lists.size(drivers)}">0</span>
+                    <span class="value" data-th-text="${#lists.size(drivers)}">0</span>
                 </div>
                 <div class="stat-icon icon-blue">
                     <i class="fas fa-users"></i>
@@ -445,7 +445,7 @@
             <div class="stat-card">
                 <div class="stat-info">
                     <span class="label">Live Deliveries</span>
-                    <span class="value" th:text="${#lists.size(deliveries)}">0</span>
+                    <span class="value" data-th-text="${#lists.size(deliveries)}">0</span>
                 </div>
                 <div class="stat-icon icon-purple">
                     <i class="fas fa-truck-fast"></i>
@@ -454,7 +454,7 @@
             <div class="stat-card" id="pending-stat-card" style="cursor:pointer" onclick="window.location='/admin/drivers?status=PENDING'">
                 <div class="stat-info">
                     <span class="label">Pending Approvals</span>
-                    <span class="value" th:text="${pendingCount}">0</span>
+                    <span class="value" data-th-text="${pendingCount}">0</span>
                 </div>
                 <div class="stat-icon icon-orange">
                     <i class="fas fa-clock"></i>
@@ -492,41 +492,41 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="driver : ${drivers}">
+                        <tr data-th-each="driver : ${drivers}">
                             <td>
                                 <div style="display: flex; align-items: center; gap: 12px">
-                                    <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.7rem; background: #f0f2f5; color: #666" th:text="${driver['name'] != null ? #strings.substring(driver['name'], 0, 1) : 'D'}">J</div>
+                                    <div class="user-avatar" style="width: 32px; height: 32px; font-size: 0.7rem; background: #f0f2f5; color: #666" data-th-text="${driver['name'] != null ? #strings.substring(driver['name'], 0, 1) : 'D'}">J</div>
                                     <div>
-                                        <div style="font-weight:700; font-size: 0.9rem" th:text="${driver['name']}">John Doe</div>
-                                        <div style="font-size:0.75rem; color:#6c757d" th:text="${driver['email']}">john@example.com</div>
-                                        <div style="font-size:0.75rem; color:#adb5bd" th:text="${driver['phone'] != null && driver['phone'] != '' ? driver['phone'] : 'No Phone'}">024 123 4567</div>
+                                        <div style="font-weight:700; font-size: 0.9rem" data-th-text="${driver['name']}">John Doe</div>
+                                        <div style="font-size:0.75rem; color:#6c757d" data-th-text="${driver['email']}">john@example.com</div>
+                                        <div style="font-size:0.75rem; color:#adb5bd" data-th-text="${driver['phone'] != null && driver['phone'] != '' ? driver['phone'] : 'No Phone'}">024 123 4567</div>
                                     </div>
                                 </div>
                             </td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.9rem">
-                                    <i th:class="${driver['vehicle'] == 'Car' ? 'fas fa-car' : (driver['vehicle'] == 'Motorcycle' ? 'fas fa-motorcycle' : 'fas fa-truck')}" style="color: #6c757d"></i>
-                                    <span th:text="${driver['vehicle']}">Car</span>
+                                    <i data-th-class="${driver['vehicle'] == 'Car' ? 'fas fa-car' : (driver['vehicle'] == 'Motorcycle' ? 'fas fa-motorcycle' : 'fas fa-truck')}" style="color: #6c757d"></i>
+                                    <span data-th-text="${driver['vehicle']}">Car</span>
                                 </div>
                             </td>
                             <td>
-                                <span th:class="${'status-badge status-' + driver['status']}" th:text="${driver['status']}">PENDING</span>
+                                <span data-th-class="${'status-badge status-' + driver['status']}" data-th-text="${driver['status']}">PENDING</span>
                             </td>
                             <td>
-                                <div th:if="${driver['status'] == 'PENDING'}" class="btn-group">
-                                    <form th:action="'/admin/approve/' + ${driver['id']}" method="post">
+                                <div data-th-if="${driver['status'] == 'PENDING'}" class="btn-group">
+                                    <form data-th-action="'/admin/approve/' + ${driver['id']}" method="post">
                                         <button type="submit" class="btn btn-approve">
                                             <i class="fas fa-check"></i> Approve
                                         </button>
                                     </form>
-                                    <form th:action="'/admin/reject/' + ${driver['id']}" method="post">
+                                    <form data-th-action="'/admin/reject/' + ${driver['id']}" method="post">
                                         <button type="submit" class="btn btn-reject">
                                             <i class="fas fa-xmark"></i> Reject
                                         </button>
                                     </form>
                                 </div>
-                                <div th:unless="${driver['status'] == 'PENDING'}">
-                                    <a th:href="${'/admin/driver/' + driver['id']}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">
+                                <div data-th-unless="${driver['status'] == 'PENDING'}">
+                                    <a data-th-href="${'/admin/driver/' + driver['id']}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">
                                         <i class="fas fa-eye"></i> View Profile
                                     </a>
                                 </div>
@@ -558,27 +558,27 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr th:each="delivery : ${deliveries}">
-                            <td style="font-weight: 700; color: var(--primary-color)" th:text="'#' + ${delivery['id']}">#101</td>
+                        <tr data-th-each="delivery : ${deliveries}">
+                            <td style="font-weight: 700; color: var(--primary-color)" data-th-text="'#' + ${delivery['id']}">#101</td>
                             <td>
                                 <div style="display: flex; flex-direction: column; gap: 4px">
                                     <div style="font-weight:700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px">
                                         <i class="fas fa-location-dot" style="color: var(--secondary-color); font-size: 0.7rem"></i>
-                                        <span th:text="${delivery['pickup']}">Pickup</span>
+                                        <span data-th-text="${delivery['pickup']}">Pickup</span>
                                     </div>
                                     <div style="font-weight:700; font-size: 0.85rem; display: flex; align-items: center; gap: 6px">
                                         <i class="fas fa-location-arrow" style="color: var(--danger-color); font-size: 0.7rem"></i>
-                                        <span th:text="${delivery['dropoff']}">Destination</span>
+                                        <span data-th-text="${delivery['dropoff']}">Destination</span>
                                     </div>
                                 </div>
                             </td>
                             <td>
-                                <span class="status-badge status-IN_TRANSIT" th:text="${delivery['status']}">IN_TRANSIT</span>
+                                <span class="status-badge status-IN_TRANSIT" data-th-text="${delivery['status']}">IN_TRANSIT</span>
                             </td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 10px">
                                     <i class="fas fa-user-circle" style="color: #dee2e6; font-size: 1.2rem"></i>
-                                    <span style="font-weight: 600; font-size: 0.85rem" th:text="${delivery['driver_name'] != null ? delivery['driver_name'] : 'Searching...'}">Unassigned</span>
+                                    <span style="font-weight: 600; font-size: 0.85rem" data-th-text="${delivery['driver_name'] != null ? delivery['driver_name'] : 'Searching...'}">Unassigned</span>
                                 </div>
                             </td>
                         </tr>

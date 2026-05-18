@@ -96,6 +96,7 @@ fun CustomerMapScreen() {
     val scope = rememberCoroutineScope()
     val repository = remember { DriverRepository() }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val focusManager = LocalFocusManager.current
     
     var carIcon by remember { mutableStateOf<Drawable?>(null) }
     
@@ -205,8 +206,6 @@ fun CustomerMapScreen() {
 
     var isPickupFocused by remember { mutableStateOf(false) }
     var isDropoffFocused by remember { mutableStateOf(false) }
-
-    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(currentOrderId) {
         if (currentOrderId != null) {
@@ -646,30 +645,30 @@ fun CustomerMapScreen() {
                 })
             }
         }
-    }
 
-    incomingCall?.let { call ->
-        AlertDialog(
-            onDismissRequest = { /* Don't dismiss */ },
-            title = { Text("Incoming Call") },
-            text = { Text("Driver ${call.callerName} is calling you...") },
-            confirmButton = {
-                Button(
-                    onClick = { incomingCall = null },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28A745))
-                ) {
-                    Icon(Icons.Default.Call, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Accept")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { incomingCall = null }) {
-                    Text("Reject", color = Color.Red)
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
+        incomingCall?.let { call ->
+            AlertDialog(
+                onDismissRequest = { /* Don\u0027t dismiss */ },
+                title = { Text("Incoming Call") },
+                text = { Text("Driver ${call.callerName} is calling you...") },
+                confirmButton = {
+                    Button(
+                        onClick = { incomingCall = null },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28A745))
+                    ) {
+                        Icon(Icons.Default.Call, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Accept")
+                    }
+                },
+                dismissButton = {
+                    OutlinedButton(onClick = { incomingCall = null }) {
+                        Text("Reject", color = Color.Red)
+                    }
+                },
+                shape = RoundedCornerShape(24.dp)
+            )
+        }
     }
 }
 
@@ -754,7 +753,7 @@ fun DriverAssignedOverlay(data: OrderStatusResponse, orderId: Int, onCancel: () 
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
                                 putExtra(Intent.EXTRA_SUBJECT, "Track my Fameko trip")
-                                putExtra(Intent.EXTRA_TEXT, "I'm on a Fameko trip! Track me live here: https://fameko-backend-1.onrender.com/track/$orderId")
+                                putExtra(Intent.EXTRA_TEXT, "I\u0027m on a Fameko trip! Track me live here: https://fameko-backend-1.onrender.com/track/$orderId")
                             }
                             context.startActivity(Intent.createChooser(shareIntent, "Share Trip via"))
                         },
@@ -809,30 +808,6 @@ fun DriverAssignedOverlay(data: OrderStatusResponse, orderId: Int, onCancel: () 
                     }
                 }
             }
-        }
-
-        uincomingCall?.let { call ->
-            AlertDialog(
-                onDismissRequest = { /* Don't dismiss */ },
-                title = { Text("Incoming Call") },
-                text = { Text("Driver ${call.callerName} is calling you...") },
-                confirmButton = {
-                    Button(
-                        onClick = { incomingCall = null },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF28A745))
-                    ) {
-                        Icon(Icons.Default.Call, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Accept")
-                    }
-                },
-                dismissButton = {
-                    OutlinedButton(onClick = { incomingCall = null }) {
-                        Text("Reject", color = Color.Red)
-                    }
-                },
-                shape = RoundedCornerShape(24.dp)
-            )
         }
     }
 }

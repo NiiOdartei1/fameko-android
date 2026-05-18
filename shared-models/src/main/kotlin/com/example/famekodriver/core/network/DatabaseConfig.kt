@@ -12,8 +12,8 @@ object DatabaseConfig {
     const val DB_PASS = "fFLDwaaBQSPOf2I5KR3Y8ZGtLtzc84PM"
 
     fun getJdbcUrl(): String {
-        // Render requires SSL for external connections
-        return "jdbc:postgresql://$DB_HOST:$DB_PORT/$DB_NAME?ssl=true"
+        // Render requires SSL. We use NonValidatingFactory to avoid issues with missing root.crt on some environments
+        return "jdbc:postgresql://$DB_HOST:$DB_PORT/$DB_NAME?ssl=true&sslmode=require&sslfactory=org.postgresql.ssl.NonValidatingFactory"
     }
 
     fun getDriverClassName(): String {

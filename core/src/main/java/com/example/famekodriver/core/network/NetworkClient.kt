@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
  */
 object NetworkClient {
     // TOGGLE THIS: true = Local Backend, false = Production
-    private const val USE_LOCAL_BACKEND = true
+    private const val USE_LOCAL_BACKEND = false
 
     private const val PRODUCTION_URL = "https://fameko-backend-1.onrender.com/"
     private const val PRODUCTION_ROUTING_URL = "https://fameko-android.onrender.com/"

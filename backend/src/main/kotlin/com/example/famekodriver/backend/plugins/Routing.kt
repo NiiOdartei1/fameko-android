@@ -158,29 +158,41 @@ fun Application.configureRouting() {
 
         // Native API for mobile apps (matching Retrofit paths)
         post("/customer/register") {
+            println("RECEIVED: Customer registration request for ${call.request.local.remoteAddress}")
             try {
                 val request = call.receive<CustomerRegisterRequest>()
+                println("API: Registering customer: ${request.name} (${request.email})")
                 val userId = registerCustomerInDb(request)
                 if (userId != null) {
+                    println("API: Customer registered with ID $userId")
                     call.respond(AuthResponse(true, "Registration successful", userId.toString(), request.name))
                 } else {
+                    println("API: Registration failed - userId is null")
                     call.respond(AuthResponse(false, "Registration failed", null, null))
                 }
             } catch (e: Exception) {
+                println("API: Error during customer registration: ${e.message}")
+                e.printStackTrace()
                 call.respond(AuthResponse(false, e.message ?: "Unknown error", null, null))
             }
         }
 
         post("/customer/login") {
+            println("RECEIVED: Customer login request for ${call.request.local.remoteAddress}")
             try {
                 val request = call.receive<LoginRequest>()
+                println("API: Login attempt for ${request.email}")
                 val user = loginCustomerInDb(request.email, request.password)
                 if (user != null) {
+                    println("API: Login successful for ${request.email}")
                     call.respond(AuthResponse(true, "Login successful", user["id"].toString(), user["name"].toString()))
                 } else {
+                    println("API: Login failed - invalid credentials for ${request.email}")
                     call.respond(AuthResponse(false, "Invalid email or password", null, null))
                 }
             } catch (e: Exception) {
+                println("API: Login error: ${e.message}")
+                e.printStackTrace()
                 call.respond(AuthResponse(false, e.message ?: "Unknown error", null, null))
             }
         }
@@ -821,35 +833,54 @@ private fun getWalletTransactions(driverId: Int): List<Map<String, Any>> {
 // Database implementation functions
 private fun registerCustomerInDb(req: CustomerRegisterRequest): Int? {
     var userId: Int? = null
-    DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = "INSERT INTO customers (name, email, phone, password, default_address, profile_picture, region) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
-        stmt.setString(1, req.name)
-        stmt.setString(2, req.email)
-        stmt.setString(3, req.phone)
-        stmt.setString(4, req.password) // In real app, hash this
-        stmt.setString(5, req.address)
-        stmt.setString(6, req.profilePicture)
-        stmt.setString(7, req.region)
-        stmt.executeUpdate()
-        val rs = stmt.generatedKeys
-        if (rs.next()) {
-            userId = rs.getInt(1)
+    println("DB: Registering customer ${req.email}")
+    try {
+        DatabaseInitializer.getDataSource().connection.use { conn ->
+            val sql = "INSERT INTO customers (name, email, phone, password, default_address, profile_picture, region) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id"
+            val stmt = conn.prepareStatement(sql)
+            stmt.setString(1, req.name)
+            stmt.setString(2, req.email)
+            stmt.setString(3, req.phone)
+            stmt.setString(4, req.password)
+            stmt.setString(5, req.address)
+            stmt.setString(6, req.profilePicture ?: "")
+            stmt.setString(7, req.region ?: "")
+            
+            val rs = stmt.executeQuery()
+            if (rs.next()) {
+                userId = rs.getInt(1)
+                println("DB: Customer registered with ID: $userId")
+            } else {
+                println("DB: No ID returned after customer insertion")
+            }
         }
+    } catch (e: Exception) {
+        println("DB: Customer registration error: ${e.message}")
+        e.printStackTrace()
+        throw e
     }
     return userId
 }
 
 private fun loginCustomerInDb(email: String, pass: String): Map<String, Any>? {
-    DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = "SELECT id, name FROM customers WHERE email = ? AND password = ?"
-        val stmt = conn.prepareStatement(sql)
-        stmt.setString(1, email)
-        stmt.setString(2, pass)
-        val rs = stmt.executeQuery()
-        if (rs.next()) {
-            return mapOf("id" to rs.getInt("id"), "name" to rs.getString("name"))
+    println("DB: Attempting login for $email")
+    try {
+        DatabaseInitializer.getDataSource().connection.use { conn ->
+            val sql = "SELECT id, name FROM customers WHERE email = ? AND password = ?"
+            val stmt = conn.prepareStatement(sql)
+            stmt.setString(1, email)
+            stmt.setString(2, pass)
+            val rs = stmt.executeQuery()
+            if (rs.next()) {
+                println("DB: Login successful for $email")
+                return mapOf("id" to rs.getInt("id"), "name" to rs.getString("name"))
+            } else {
+                println("DB: Login failed for $email - no match")
+            }
         }
+    } catch (e: Exception) {
+        println("DB: Login error: ${e.message}")
+        e.printStackTrace()
     }
     return null
 }

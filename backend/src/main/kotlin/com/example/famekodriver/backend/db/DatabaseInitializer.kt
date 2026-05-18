@@ -13,11 +13,22 @@ object DatabaseInitializer {
         if (dataSource == null) {
             println("Initializing Render PostgreSQL connection...")
             try {
+                // Prioritize Environment Variables for Render Deployment
+                val envJdbcUrl = System.getenv("DB_URL")
+                val envUser = System.getenv("DB_USER")
+                val envPass = System.getenv("DB_PASS")
+
+                val finalUrl = envJdbcUrl ?: DatabaseConfig.getJdbcUrl()
+                val finalUser = envUser ?: DatabaseConfig.DB_USER
+                val finalPass = envPass ?: DatabaseConfig.DB_PASS
+
+                println("Using Connection URL: ${finalUrl.take(25)}...")
+
                 Class.forName("org.postgresql.Driver")
                 val config = HikariConfig().apply {
-                    jdbcUrl = DatabaseConfig.getJdbcUrl()
-                    username = DatabaseConfig.DB_USER
-                    password = DatabaseConfig.DB_PASS
+                    jdbcUrl = finalUrl
+                    username = finalUser
+                    password = finalPass
                     driverClassName = "org.postgresql.Driver"
                     
                     maximumPoolSize = 5 // Low pool size for free tier

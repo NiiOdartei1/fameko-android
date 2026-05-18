@@ -69,21 +69,28 @@ class CustomerSignupActivity : AppCompatActivity() {
 
             btnSignup.isEnabled = false
             lifecycleScope.launch {
+                println("Fameko: Starting registration for $email")
                 repository.customerRegister(name, email, phone, address, password, region = region)
                     .onSuccess {
+                        println("Fameko: Registration success, attempting auto-login")
                         Toast.makeText(this@CustomerSignupActivity, "Account created successfully! Logging in...", Toast.LENGTH_LONG).show()
                         
                         // Automatic login
                         repository.customerLogin(email, password).onSuccess { (id, customerName) ->
+                            println("Fameko: Auto-login success for $id")
                             sessionManager.saveSession(id, customerName)
                             val intent = Intent().setClassName(this@CustomerSignupActivity, "com.example.famekodriver.customer.CustomerMapActivity")
                             startActivity(intent)
                             finishAffinity()
-                        }.onFailure {
-                            finish()
+                        }.onFailure { error ->
+                            println("Fameko: Auto-login failed: ${error.message}")
+                            btnSignup.isEnabled = true
+                            Toast.makeText(this@CustomerSignupActivity, "Auto-login failed: ${error.message}. Please login manually.", Toast.LENGTH_LONG).show()
+                            // Don't finish, let them try to login manually or see the error
                         }
                     }
                     .onFailure { error ->
+                        println("Fameko: Registration failed: ${error.message}")
                         btnSignup.isEnabled = true
                         Toast.makeText(this@CustomerSignupActivity, "Signup failed: ${error.message}", Toast.LENGTH_LONG).show()
                     }

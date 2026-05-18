@@ -3,9 +3,6 @@ package com.example.famekodriver.core.data.repository
 import com.example.famekodriver.core.domain.model.*
 import com.example.famekodriver.core.network.DatabaseConfig
 import com.example.famekodriver.core.network.NetworkClient
-import com.example.famekodriver.core.network.DriverStatusResponse
-import com.example.famekodriver.core.network.OrderCreateRequest
-import com.example.famekodriver.core.network.OrderStatusResponse
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -15,7 +12,13 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.sql.DriverManager
 import java.sql.ResultSet
+import java.sql.Statement
+import java.text.SimpleDateFormat
+import java.util.*
+import java.io.File
+import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 
 /**
  * Repository for driver-related database operations.
@@ -126,7 +129,7 @@ class DriverRepository {
                 Result.success(null)
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "API Login failed, falling back to JDBC", e)
+            Log.e("FamekoRepo", "API Login failed, falling back to JDBC", e)
             try {
                 ensureDriverLoaded()
                 val url = DatabaseConfig.getJdbcUrl()
@@ -180,7 +183,7 @@ class DriverRepository {
                 Result.failure(Exception(response.message ?: "Login failed"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Customer API Login failed, falling back to JDBC", e)
+            Log.e("FamekoRepo", "Customer API Login failed, falling back to JDBC", e)
             try {
                 ensureDriverLoaded()
                 val url = DatabaseConfig.getJdbcUrl()
@@ -239,33 +242,6 @@ class DriverRepository {
     }
 
     /**
-     * Fetches recent deliveries for a driver
-     */
-    suspend fun getRecentDeliveries(driverId: String): Result<List<Delivery>> = withContext(Dispatchers.IO) {
-        try {
-            ensureDriverLoaded()
-            DriverManager.getConnection(
-                DatabaseConfig.getJdbcUrl(),
-                DatabaseConfig.DB_USER,
-                DatabaseConfig.DB_PASS,
-            ).use { connection ->
-                val query = "SELECT * FROM deliveries WHERE driver_id = ? ORDER BY id DESC LIMIT 10"
-                connection.prepareStatement(query).use { stmt ->
-                    stmt.setString(1, driverId)
-                    val rs = stmt.executeQuery()
-                    val list = mutableListOf<Delivery>()
-                    while (rs.next()) {
-                        list.add(rs.toDelivery())
-                    }
-                    Result.success(list)
-                }
-            }
-        } catch (_: Exception) {
-            Result.failure(Exception("Failed to fetch recent deliveries"))
-        }
-    }
-
-    /**
      * Updates driver's online status
      */
     suspend fun updateOnlineStatus(driverId: String, isOnline: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
@@ -302,7 +278,7 @@ class DriverRepository {
                 Result.failure(Exception(response.message ?: "Registration failed"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "API Registration failed, falling back to JDBC", e)
+            Log.e("FamekoRepo", "API Registration failed, falling back to JDBC", e)
             // Fallback to JDBC if API is not available
             try {
                 ensureDriverLoaded()
@@ -343,7 +319,7 @@ class DriverRepository {
         vehicleType: String,
         serviceType: String,
         vehicleNumber: String,
-        docs: Map<String, java.io.File> = emptyMap()
+        docs: Map<String, File> = emptyMap()
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val nameBody = name.toRequestBody(MultipartBody.FORM)
@@ -377,14 +353,14 @@ class DriverRepository {
                 Result.failure(Exception(response.message ?: "Registration failed"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Driver API Registration failed", e)
+            Log.e("FamekoRepo", "Driver API Registration failed", e)
             Result.failure(Exception("Registration failed: ${e.localizedMessage}"))
         }
     }
 
-    suspend fun uploadDocument(driverId: String, docType: String, file: java.io.File): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun uploadDocument(driverId: String, docType: String, file: File): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            android.util.Log.d("FamekoUpload", "Starting Cloudinary upload for driver $driverId, type: $docType")
+            Log.d("FamekoUpload", "Starting Cloudinary upload for driver $driverId, type: $docType")
             
             // Use raw OkHttp with the configured client for speed and timeouts
             val cloudinaryUrl = "https://api.cloudinary.com/v1_1/df3jnubvy/image/upload"
@@ -396,7 +372,7 @@ class DriverRepository {
                 .addFormDataPart("upload_preset", uploadPreset)
                 .build()
 
-            val request = okhttp3.Request.Builder()
+            val request = Request.Builder()
                 .url(cloudinaryUrl)
                 .post(requestBody)
                 .build()
@@ -406,15 +382,15 @@ class DriverRepository {
             
             if (!response.isSuccessful) {
                 val errorMsg = response.body?.string() ?: response.message
-                android.util.Log.e("FamekoUpload", "Cloudinary HTTP error: $errorMsg")
+                Log.e("FamekoUpload", "Cloudinary HTTP error: $errorMsg")
                 throw Exception("Cloudinary upload failed: $errorMsg")
             }
 
             val responseBody = response.body?.string() ?: throw Exception("Empty response from Cloudinary")
-            val jsonResponse = com.google.gson.JsonParser.parseString(responseBody).asJsonObject
+            val jsonResponse = JsonParser.parseString(responseBody).asJsonObject
             val fileUrl = jsonResponse.get("secure_url").asString
 
-            android.util.Log.d("FamekoUpload", "Cloudinary success! URL: $fileUrl")
+            Log.d("FamekoUpload", "Cloudinary success! URL: $fileUrl")
 
             // 2. Send the URL to your Backend
             val backendResponse = NetworkClient.famekoApi.uploadDriverDocument(driverId, docType, fileUrl)
@@ -425,7 +401,7 @@ class DriverRepository {
                 Result.failure(Exception(backendResponse.message ?: "Backend rejected the link"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoUpload", "Cloudinary Flow Exception", e)
+            Log.e("FamekoUpload", "Cloudinary Flow Exception", e)
             Result.failure(Exception("Upload failed: ${e.localizedMessage}"))
         }
     }
@@ -517,7 +493,7 @@ class DriverRepository {
                         stmt.setString(6, driverId)
                         stmt.executeUpdate()
                     }
-                } catch (spatialError: Exception) {
+                } catch (_: Exception) {
                     // Fallback to simple latitude/longitude update if PostGIS extension is missing
                     val basicQuery = "UPDATE driver_stats SET latitude = ?, longitude = ?, bearing = ? WHERE driver_id = ?"
                     connection.prepareStatement(basicQuery).use { stmt ->
@@ -556,16 +532,16 @@ class DriverRepository {
                     vehicleType = request.vehicleType,
                     routeType = request.routeType,
                     waypoints = route.geometry.coordinates.size,
-                    computedAt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
-                        timeZone = java.util.TimeZone.getTimeZone("UTC")
-                    }.format(java.util.Date())
+                    computedAt = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }.format(Date())
                 )
                 Result.success(response)
             } else {
                 Result.failure(Exception("No valid route found from OSRM: ${osrmResponse.code}"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Direct OSRM Routing failed, falling back to backend", e)
+            Log.e("FamekoRepo", "Direct OSRM Routing failed, falling back to backend", e)
             try {
                 // Fallback to backend as a last resort
                 val response = NetworkClient.routingApi.calculateRoute(request)
@@ -680,7 +656,7 @@ class DriverRepository {
                 Result.failure(Exception(response["message"]?.toString() ?: "Cancellation failed"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Order cancellation via API failed, falling back to JDBC", e)
+            Log.e("FamekoRepo", "Order cancellation via API failed, falling back to JDBC", e)
             try {
                 ensureDriverLoaded()
                 DriverManager.getConnection(
@@ -722,7 +698,7 @@ class DriverRepository {
             
             Result.success(filteredResults)
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Direct OSM Geocode failed", e)
+            Log.e("FamekoRepo", "Direct OSM Geocode failed", e)
             Result.failure(e)
         }
     }
@@ -735,7 +711,7 @@ class DriverRepository {
                 type = "address"
             ))
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Reverse geocode failed", e)
+            Log.e("FamekoRepo", "Reverse geocode failed", e)
             Result.failure(e)
         }
     }
@@ -768,7 +744,7 @@ class DriverRepository {
                 Result.failure(Exception(response["message"]?.toString() ?: "Unknown error"))
             }
         } catch (e: Exception) {
-            android.util.Log.e("FamekoRepo", "Order creation via API failed, falling back to JDBC", e)
+            Log.e("FamekoRepo", "Order creation via API failed, falling back to JDBC", e)
             try {
                 ensureDriverLoaded()
                 DriverManager.getConnection(
@@ -784,7 +760,7 @@ class DriverRepository {
                             VALUES (?, ?, 'Pending', ?, ?, 'Cash on Delivery', 'Customer', ?, '0000000000')
                         """.trimIndent()
                         
-                        val orderId = connection.prepareStatement(orderQuery, java.sql.Statement.RETURN_GENERATED_KEYS).use { stmt ->
+                        val orderId = connection.prepareStatement(orderQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
                             stmt.setInt(1, customerId.toInt())
                             stmt.setDouble(2, estimatedFare)
                             stmt.setDouble(3, dropoffLat)

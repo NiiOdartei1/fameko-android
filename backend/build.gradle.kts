@@ -22,8 +22,7 @@ dependencies {
     implementation(libs.ktor.server.host.common)
     implementation(libs.logback.classic)
     implementation(libs.hikaricp)
-    
-    implementation("org.postgresql:postgresql:42.7.2")
+    implementation(libs.postgresql)
 }
 
 kotlin {

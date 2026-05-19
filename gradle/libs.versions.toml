@@ -28,6 +28,8 @@ ktor = "3.4.3"
 logback = "1.4.11"
 hikaricp = "5.1.0"
 cloudinary = "3.0.2"
+postgresql = "42.7.2"
+postgresqlAndroid = "42.2.5"
 
 [libraries]
 hikaricp = { group = "com.zaxxer", name = "HikariCP", version.ref = "hikaricp" }
@@ -74,6 +76,8 @@ retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 cloudinary-android = { group = "com.cloudinary", name = "cloudinary-android", version.ref = "cloudinary" }
+postgresql = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
+postgresql-android = { group = "org.postgresql", name = "postgresql", version.ref = "postgresqlAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -54,7 +54,7 @@ import com.example.famekodriver.core.domain.model.FamekoEvent
 import com.example.famekodriver.core.domain.model.DriverLocation
 import com.example.famekodriver.core.domain.model.RouteLocation
 import com.example.famekodriver.core.domain.model.RouteRequest
-import com.example.famekodriver.core.network.OrderStatusResponse
+import com.example.famekodriver.core.domain.model.OrderStatusResponse
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -635,8 +635,9 @@ fun CustomerMapScreen() {
             }
         }
 
-        if (orderStatusData != null) {
-            when (orderStatusData!!.status) {
+        val currentStatusData = orderStatusData
+        if (currentStatusData != null) {
+            when (currentStatusData.status) {
                 "PENDING" -> SearchingOverlay(onCancel = { 
                     scope.launch {
                         currentOrderId?.let { repository.cancelOrder(it) }
@@ -644,7 +645,7 @@ fun CustomerMapScreen() {
                         orderStatusData = null
                     }
                 })
-                "ASSIGNED", "IN_TRANSIT" -> DriverAssignedOverlay(orderStatusData!!, currentOrderId ?: 0, onCancel = {
+                "ASSIGNED", "IN_TRANSIT" -> DriverAssignedOverlay(currentStatusData, currentOrderId ?: 0, onCancel = {
                     scope.launch {
                         currentOrderId?.let { repository.cancelOrder(it) }
                         currentOrderId = null

@@ -13,12 +13,19 @@ object DatabaseInitializer {
         if (dataSource == null) {
             println("Initializing Render PostgreSQL connection...")
             try {
-                // Prioritize Environment Variables for Render Deployment
-                val envJdbcUrl = System.getenv("DB_URL")
+                // Prioritize Environment Variables for Railway/Render Deployment
+                // Railway provides DATABASE_URL by default
+                val envJdbcUrl = System.getenv("DATABASE_URL") ?: System.getenv("DB_URL")
                 val envUser = System.getenv("DB_USER")
                 val envPass = System.getenv("DB_PASS")
 
-                val finalUrl = envJdbcUrl ?: DatabaseConfig.getJdbcUrl()
+                var finalUrl = envJdbcUrl ?: DatabaseConfig.getJdbcUrl()
+                
+                // Fix: Ensure the URL starts with "jdbc:" which is required by the JDBC driver
+                if (!finalUrl.startsWith("jdbc:")) {
+                    finalUrl = "jdbc:$finalUrl"
+                }
+
                 val finalUser = envUser ?: DatabaseConfig.DB_USER
                 val finalPass = envPass ?: DatabaseConfig.DB_PASS
 

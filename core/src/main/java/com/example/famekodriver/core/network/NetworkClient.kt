@@ -12,8 +12,8 @@ object NetworkClient {
     // TOGGLE THIS: true = Local Backend, false = Production
     private const val USE_LOCAL_BACKEND = false
 
-    private const val PRODUCTION_URL = "https://fameko-backend-1.onrender.com/"
-    private const val PRODUCTION_ROUTING_URL = "https://fameko-android.onrender.com/"
+    private const val PRODUCTION_URL = "https://fameko-android-production.up.railway.app/"
+    private const val PRODUCTION_ROUTING_URL = "https://fameko-android-production.up.railway.app/"
 
     // 10.0.2.2 is ONLY for Emulators. 
     // YOUR PHONE is on 192.168.100.x

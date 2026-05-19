@@ -1,10 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org">
+
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Fameko Admin - Driver Details</title>
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"/>
+
     <style>
         :root {
             --primary-color: #004E89;
@@ -17,6 +21,10 @@
             --sidebar-width: 260px;
             --card-shadow: 0 2px 12px rgba(0,0,0,0.08);
             --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
@@ -35,6 +43,7 @@
             height: 100vh;
             position: fixed;
             z-index: 1000;
+            overflow-y: auto;
         }
 
         .sidebar-header {
@@ -71,7 +80,10 @@
             transform: translateX(5px);
         }
 
-        .sidebar-menu li i { margin-right: 15px; width: 20px; }
+        .sidebar-menu li i {
+            margin-right: 15px;
+            width: 20px;
+        }
 
         .sidebar-menu li.active {
             background-color: white;
@@ -126,11 +138,39 @@
             font-size: 1rem;
         }
 
-        .status-badge { padding: 6px 14px; border-radius: 30px; font-size: 0.75rem; font-weight: 700; }
-        .status-PENDING, .status-PENDING_DOCS { background: #fff9db; color: #f08c00; }
-        .status-APPROVED { background: #ebfbee; color: #2b8a3e; }
-        .status-REJECTED { background: #fff5f5; color: #c92a2a; }
-        .status-SUSPENDED { background: #fff4e6; color: #d9480f; }
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .status-PENDING,
+        .status-PENDING_DOCS {
+            background: #fff9db;
+            color: #f08c00;
+        }
+
+        .status-APPROVED {
+            background: #ebfbee;
+            color: #2b8a3e;
+        }
+
+        .status-REJECTED {
+            background: #fff5f5;
+            color: #c92a2a;
+        }
+
+        .status-SUSPENDED {
+            background: #fff4e6;
+            color: #d9480f;
+        }
+
+        .status-UNKNOWN {
+            background: #e9ecef;
+            color: #495057;
+        }
 
         .doc-grid {
             display: grid;
@@ -178,169 +218,376 @@
             transition: var(--transition);
         }
 
-        .btn-approve { background-color: var(--secondary-color); color: white; }
-        .btn-reject { background-color: var(--danger-color); color: white; }
-        .btn-suspend { background-color: var(--warning-color); color: var(--dark-text); }
-        .btn-back { background-color: #f1f3f5; color: #495057; text-decoration: none; display: inline-block; }
+        .btn-approve {
+            background-color: var(--secondary-color);
+            color: white;
+        }
 
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .btn-reject {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
+        .btn-suspend {
+            background-color: var(--warning-color);
+            color: var(--dark-text);
+        }
+
+        .btn-back {
+            background-color: #f1f3f5;
+            color: #495057;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .action-buttons {
+            margin-top: 40px;
+            display: flex;
+            gap: 15px;
+            border-top: 1px solid #eee;
+            padding-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .debug-status {
+            margin-top: 10px;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 992px) {
+            .sidebar {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+
+            body {
+                flex-direction: column;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
+
 <body>
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <i class="fas fa-shield-alt"></i>
-            <h2 style="margin:0">FAMEKO</h2>
-        </div>
-        <ul class="sidebar-menu">
-            <li th:class="${activePage == 'dashboard' ? 'active' : ''}" onclick="window.location='/admin/dashboard'"><i class="fas fa-th-large"></i> Dashboard</li>
-            <li th:class="${activePage == 'map' ? 'active' : ''}" onclick="window.location='/admin/map'"><i class="fas fa-map-location-dot"></i> Live Map</li>
-            <li th:class="${activePage == 'drivers' ? 'active' : ''}" onclick="window.location='/admin/drivers'"><i class="fas fa-id-card"></i> Drivers</li>
-            <li th:class="${activePage == 'customers' ? 'active' : ''}" onclick="window.location='/admin/customers'"><i class="fas fa-user-group"></i> Customers</li>
-            <li th:class="${activePage == 'deliveries' ? 'active' : ''}" onclick="window.location='/admin/deliveries'"><i class="fas fa-route"></i> Deliveries</li>
-            <li><i class="fas fa-chart-pie"></i> Analytics</li>
-            <li th:class="${activePage == 'settings' ? 'active' : ''}" onclick="window.location='/admin/settings'"><i class="fas fa-gear"></i> Settings</li>
-        </ul>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <i class="fas fa-shield-alt"></i>
+        <h2 style="margin:0">FAMEKO</h2>
     </div>
 
-    <div class="main-content">
-        <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-            <h1>Driver Details</h1>
-            <a href="/admin/drivers" class="btn btn-back"><i class="fas fa-arrow-left"></i> Back to List</a>
-        </div>
+    <ul class="sidebar-menu">
+        <li th:class="${activePage == 'dashboard' ? 'active' : ''}"
+            onclick="window.location='/admin/dashboard'">
+            <i class="fas fa-th-large"></i> Dashboard
+        </li>
 
+        <li th:class="${activePage == 'map' ? 'active' : ''}"
+            onclick="window.location='/admin/map'">
+            <i class="fas fa-map-location-dot"></i> Live Map
+        </li>
+
+        <li th:class="${activePage == 'drivers' ? 'active' : ''}"
+            onclick="window.location='/admin/drivers'">
+            <i class="fas fa-id-card"></i> Drivers
+        </li>
+
+        <li th:class="${activePage == 'customers' ? 'active' : ''}"
+            onclick="window.location='/admin/customers'">
+            <i class="fas fa-user-group"></i> Customers
+        </li>
+
+        <li th:class="${activePage == 'deliveries' ? 'active' : ''}"
+            onclick="window.location='/admin/deliveries'">
+            <i class="fas fa-route"></i> Deliveries
+        </li>
+
+        <li>
+            <i class="fas fa-chart-pie"></i> Analytics
+        </li>
+
+        <li th:class="${activePage == 'settings' ? 'active' : ''}"
+            onclick="window.location='/admin/settings'">
+            <i class="fas fa-gear"></i> Settings
+        </li>
+    </ul>
+</div>
+
+<div class="main-content">
+
+    <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1>Driver Details</h1>
+
+        <a href="/admin/drivers" class="btn btn-back">
+            <i class="fas fa-arrow-left"></i> Back to List
+        </a>
+    </div>
+
+    <!-- Normalize status once -->
+    <div th:with="status=${driver['status'] != null ? #strings.trim(driver['status'].toString()).toUpperCase() : 'UNKNOWN'}">
+
+        <!-- PERSONAL INFO -->
         <div class="card">
-            <div class="card-header">Personal Information</div>
+
+            <div class="card-header">
+                Personal Information
+            </div>
+
             <div class="card-body">
+
                 <div class="info-grid">
+
                     <div class="info-item">
                         <label>Full Name</label>
                         <span th:text="${driver['full_name']}">John Doe</span>
                     </div>
+
                     <div class="info-item">
                         <label>Status</label>
-                        <span th:with="s=${driver['status'] != null ? driver['status'].toString().toUpperCase() : 'UNKNOWN'}"
-                              th:class="${'status-badge status-' + s}"
-                              th:text="${s}">PENDING</span>
+
+                        <span th:class="${'status-badge status-' + status}"
+                              th:text="${status}">
+                                PENDING
+                            </span>
                     </div>
+
                     <div class="info-item">
                         <label>Email Address</label>
                         <span th:text="${driver['email']}">john@example.com</span>
                     </div>
+
                     <div class="info-item">
                         <label>Phone Number</label>
-                        <span th:text="${driver['phone']}">024 123 4567</span>
+                        <span th:text="${driver['phone']}">0241234567</span>
                     </div>
+
                     <div class="info-item">
                         <label>Region</label>
                         <span th:text="${driver['region']}">Greater Accra</span>
                     </div>
+
                     <div class="info-item">
                         <label>Vehicle</label>
-                        <span th:text="${driver['vehicle_type'] + ' (' + driver['vehicle_number'] + ')'}">Car (GW-123-24)</span>
+
+                        <span th:text="${driver['vehicle_type'] + ' (' + driver['vehicle_number'] + ')'}">
+                                Car (GW-123-24)
+                            </span>
                     </div>
+
                 </div>
+
             </div>
         </div>
 
+        <!-- DOCUMENTS -->
         <div class="card">
-            <div class="card-header">Verification Documents</div>
+
+            <div class="card-header">
+                Verification Documents
+            </div>
+
             <div class="card-body">
+
                 <div class="doc-grid">
-                    <!-- Profile Picture -->
+
+                    <!-- PROFILE -->
                     <div class="doc-card">
                         <div class="doc-label">Profile Picture</div>
+
                         <div class="doc-img-container">
-                            <img th:if="${driver['profile_picture'] != null && driver['profile_picture'] != ''}"
+
+                            <img th:if="${driver['profile_picture'] != null && !#strings.isEmpty(driver['profile_picture'])}"
                                  th:src="${driver['profile_picture']}"
                                  onclick="window.open(this.src)" />
-                            <span th:unless="${driver['profile_picture'] != null && driver['profile_picture'] != ''}" style="color:#adb5bd">Not Uploaded</span>
+
+                            <span th:unless="${driver['profile_picture'] != null && !#strings.isEmpty(driver['profile_picture'])}"
+                                  style="color:#adb5bd">
+                                    Not Uploaded
+                                </span>
+
                         </div>
                     </div>
 
-                    <!-- Driver's License -->
+                    <!-- LICENSE -->
                     <div class="doc-card">
                         <div class="doc-label">Driver's License</div>
+
                         <div class="doc-img-container">
-                            <img th:if="${driver['license_image'] != null && driver['license_image'] != ''}"
+
+                            <img th:if="${driver['license_image'] != null && !#strings.isEmpty(driver['license_image'])}"
                                  th:src="${driver['license_image']}"
                                  onclick="window.open(this.src)" />
-                            <span th:unless="${driver['license_image'] != null && driver['license_image'] != ''}" style="color:#adb5bd">Not Uploaded</span>
+
+                            <span th:unless="${driver['license_image'] != null && !#strings.isEmpty(driver['license_image'])}"
+                                  style="color:#adb5bd">
+                                    Not Uploaded
+                                </span>
+
                         </div>
                     </div>
 
-                    <!-- Ghana Card -->
+                    <!-- GHANA CARD -->
                     <div class="doc-card">
                         <div class="doc-label">Ghana Card</div>
+
                         <div class="doc-img-container">
-                            <img th:if="${driver['vehicle_image'] != null && driver['vehicle_image'] != ''}"
+
+                            <img th:if="${driver['vehicle_image'] != null && !#strings.isEmpty(driver['vehicle_image'])}"
                                  th:src="${driver['vehicle_image']}"
                                  onclick="window.open(this.src)" />
-                            <span th:unless="${driver['vehicle_image'] != null && driver['vehicle_image'] != ''}" style="color:#adb5bd">Not Uploaded</span>
+
+                            <span th:unless="${driver['vehicle_image'] != null && !#strings.isEmpty(driver['vehicle_image'])}"
+                                  style="color:#adb5bd">
+                                    Not Uploaded
+                                </span>
+
                         </div>
                     </div>
 
-                    <!-- Insurance -->
+                    <!-- INSURANCE -->
                     <div class="doc-card">
                         <div class="doc-label">Insurance Certificate</div>
+
                         <div class="doc-img-container">
-                            <img th:if="${driver['id_front_image'] != null && driver['id_front_image'] != ''}"
+
+                            <img th:if="${driver['id_front_image'] != null && !#strings.isEmpty(driver['id_front_image'])}"
                                  th:src="${driver['id_front_image']}"
                                  onclick="window.open(this.src)" />
-                            <span th:unless="${driver['id_front_image'] != null && driver['id_front_image'] != ''}" style="color:#adb5bd">Not Uploaded</span>
+
+                            <span th:unless="${driver['id_front_image'] != null && !#strings.isEmpty(driver['id_front_image'])}"
+                                  style="color:#adb5bd">
+                                    Not Uploaded
+                                </span>
+
                         </div>
                     </div>
 
-                    <!-- Roadworthy -->
+                    <!-- ROADWORTHY -->
                     <div class="doc-card">
                         <div class="doc-label">Roadworthy Certificate</div>
+
                         <div class="doc-img-container">
-                            <img th:if="${driver['id_back_image'] != null && driver['id_back_image'] != ''}"
+
+                            <img th:if="${driver['id_back_image'] != null && !#strings.isEmpty(driver['id_back_image'])}"
                                  th:src="${driver['id_back_image']}"
                                  onclick="window.open(this.src)" />
-                            <span th:unless="${driver['id_back_image'] != null && driver['id_back_image'] != ''}" style="color:#adb5bd">Not Uploaded</span>
+
+                            <span th:unless="${driver['id_back_image'] != null && !#strings.isEmpty(driver['id_back_image'])}"
+                                  style="color:#adb5bd">
+                                    Not Uploaded
+                                </span>
+
                         </div>
                     </div>
+
                 </div>
 
-                <div th:with="status=${driver['status']}"
-                     style="margin-top: 40px; display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 30px;">
-                    <!-- Debug info (hidden) -->
-                    <!-- Status is: [[${driver['status']}]] -->
-
-                    <!-- Pending Flow -->
-                    <div th:if="${status == 'PENDING' || status == 'PENDING_DOCS'}" style="display: flex; gap: 15px;">
-                        <form th:action="${'/admin/approve/' + driver['id']}" method="post">
-                            <button type="submit" class="btn btn-approve"><i class="fas fa-check"></i> Approve Driver Account</button>
-                        </form>
-                        <form th:action="${'/admin/reject/' + driver['id']}" method="post">
-                            <button type="submit" class="btn btn-reject"><i class="fas fa-xmark"></i> Reject Account</button>
-                        </form>
-                    </div>
-
-                    <!-- Approved Flow -->
-                    <div th:if="${status == 'APPROVED'}" style="display: flex; gap: 15px;">
-                        <form th:action="${'/admin/suspend/' + driver['id']}" method="post">
-                            <button type="submit" class="btn btn-suspend"><i class="fas fa-pause"></i> Suspend Driver</button>
-                        </form>
-                    </div>
-
-                    <!-- Suspended Flow -->
-                    <div th:if="${status == 'SUSPENDED'}" style="display: flex; gap: 15px;">
-                        <form th:action="${'/admin/release/' + driver['id']}" method="post">
-                            <button type="submit" class="btn btn-approve"><i class="fas fa-play"></i> Release/Re-activate Driver</button>
-                        </form>
-                    </div>
-
-                    <!-- Rejected Flow -->
-                    <div th:if="${status == 'REJECTED'}" style="display: flex; gap: 15px;">
-                        <form th:action="${'/admin/approve/' + driver['id']}" method="post">
-                            <button type="submit" class="btn btn-approve"><i class="fas fa-rotate-left"></i> Re-consider and Approve</button>
-                        </form>
-                    </div>
+                <!-- DEBUG -->
+                <div class="debug-status">
+                    Current Status:
+                    <strong th:text="${status}">UNKNOWN</strong>
                 </div>
+
+                <!-- ACTION BUTTONS -->
+                <div class="action-buttons">
+
+                    <!-- PENDING -->
+                    <div th:if="${status == 'PENDING' || status == 'PENDING_DOCS'}"
+                         style="display:flex; gap:15px;">
+
+                        <form th:action="${'/admin/approve/' + driver['id']}"
+                              method="post">
+
+                            <button type="submit"
+                                    class="btn btn-approve">
+                                <i class="fas fa-check"></i>
+                                Approve Driver Account
+                            </button>
+                        </form>
+
+                        <form th:action="${'/admin/reject/' + driver['id']}"
+                              method="post">
+
+                            <button type="submit"
+                                    class="btn btn-reject">
+                                <i class="fas fa-xmark"></i>
+                                Reject Account
+                            </button>
+                        </form>
+
+                    </div>
+
+                    <!-- APPROVED -->
+                    <div th:if="${status == 'APPROVED'}"
+                         style="display:flex; gap:15px;">
+
+                        <form th:action="${'/admin/suspend/' + driver['id']}"
+                              method="post">
+
+                            <button type="submit"
+                                    class="btn btn-suspend">
+                                <i class="fas fa-pause"></i>
+                                Suspend Driver
+                            </button>
+                        </form>
+
+                    </div>
+
+                    <!-- SUSPENDED -->
+                    <div th:if="${status == 'SUSPENDED'}"
+                         style="display:flex; gap:15px;">
+
+                        <form th:action="${'/admin/release/' + driver['id']}"
+                              method="post">
+
+                            <button type="submit"
+                                    class="btn btn-approve">
+                                <i class="fas fa-play"></i>
+                                Release/Re-activate Driver
+                            </button>
+                        </form>
+
+                    </div>
+
+                    <!-- REJECTED -->
+                    <div th:if="${status == 'REJECTED'}"
+                         style="display:flex; gap:15px;">
+
+                        <form th:action="${'/admin/approve/' + driver['id']}"
+                              method="post">
+
+                            <button type="submit"
+                                    class="btn btn-approve">
+                                <i class="fas fa-rotate-left"></i>
+                                Re-consider and Approve
+                            </button>
+                        </form>
+
+                    </div>
+
+                </div>
+
             </div>
+
         </div>
+
     </div>
+
+</div>
+
 </body>
 </html>

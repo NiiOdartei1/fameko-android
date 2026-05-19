@@ -162,7 +162,6 @@ object DatabaseInitializer {
 
     private fun createTables(conn: Connection) {
         val statements = listOf(
-            "CREATE EXTENSION IF NOT EXISTS postgis;",
             """
             CREATE TABLE IF NOT EXISTS drivers (
                 id SERIAL PRIMARY KEY,

@@ -353,6 +353,52 @@ fun Application.configureRouting() {
             }
         }
 
+        get("/driver/stats/{id}") {
+            val id = call.parameters["id"]
+            if (id == null) {
+                call.respond(com.example.famekodriver.core.domain.model.DriverStats()) // return default empty stats
+                return@get
+            }
+            try {
+                val stats = getDriverStatsFromDb(id)
+                if (stats != null) {
+                    call.respond(stats)
+                } else {
+                    call.respond(com.example.famekodriver.core.domain.model.DriverStats())
+                }
+            } catch (e: Exception) {
+                call.respond(com.example.famekodriver.core.domain.model.DriverStats())
+            }
+        }
+
+        post("/driver/update-online-status") {
+            try {
+                val params = call.receiveParameters()
+                val driverId = params["driver_id"] ?: ""
+                val isOnline = params["is_online"]?.toBoolean() ?: false
+                
+                updateDriverOnlineStatusInDb(driverId, isOnline)
+                call.respond(AuthResponse(true, "Status updated", driverId, null))
+            } catch (e: Exception) {
+                call.respond(AuthResponse(false, e.message ?: "Update failed", null, null))
+            }
+        }
+
+        post("/driver/update-location") {
+            try {
+                val params = call.receiveParameters()
+                val driverId = params["driver_id"] ?: ""
+                val lat = params["latitude"]?.toDoubleOrNull() ?: 0.0
+                val lng = params["longitude"]?.toDoubleOrNull() ?: 0.0
+                val bearing = params["bearing"]?.toFloatOrNull() ?: 0f
+                
+                updateDriverLocationInDb(driverId, lat, lng, bearing)
+                call.respond(AuthResponse(true, "Location updated", driverId, null))
+            } catch (e: Exception) {
+                call.respond(AuthResponse(false, e.message ?: "Update failed", null, null))
+            }
+        }
+
         route("/chat") {
             post("/send") {
                 val message = call.receive<Message>()
@@ -1042,6 +1088,30 @@ private fun getDriverStatusFromDb(id: String): Map<String, Any> {
     return mapOf("success" to false, "status" to "UNKNOWN", "missingDocs" to emptyList<String>())
 }
 
+private fun getDriverStatsFromDb(id: String): DriverStats? {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "SELECT * FROM driver_stats WHERE driver_id = ?"
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.setInt(1, id.toInt())
+            val rs = stmt.executeQuery()
+            if (rs.next()) {
+                return DriverStats(
+                    isOnline = rs.getBoolean("is_online"),
+                    activeDeliveries = rs.getInt("active_deliveries"),
+                    completedToday = rs.getInt("completed_today"),
+                    earningsToday = rs.getDouble("earnings_today"),
+                    rating = rs.getDouble("rating"),
+                    ratingCount = rs.getInt("rating_count"),
+                    totalDeliveries = rs.getInt("total_deliveries"),
+                    completionRate = rs.getInt("completion_rate"),
+                    totalEarnings = rs.getDouble("total_earnings")
+                )
+            }
+        }
+    }
+    return null
+}
+
 private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371 // radius of earth in km
     val dLat = Math.toRadians(lat2 - lat1)
@@ -1169,6 +1239,48 @@ private fun updateDriverStatus(id: String, status: String) {
         stmt.setString(1, status)
         stmt.setInt(2, id.toInt())
         stmt.executeUpdate()
+    }
+}
+
+private fun updateDriverOnlineStatusInDb(driverId: String, isOnline: Boolean) {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val sql = "UPDATE driver_stats SET is_online = ? WHERE driver_id = ?"
+        val stmt = conn.prepareStatement(sql)
+        stmt.setBoolean(1, isOnline)
+        stmt.setInt(2, driverId.toInt())
+        stmt.executeUpdate()
+    }
+}
+
+private fun updateDriverLocationInDb(driverId: String, lat: Double, lng: Double, bearing: Float) {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        val spatialQuery = """
+            UPDATE driver_stats 
+            SET latitude = ?, longitude = ?, bearing = ?, 
+                location = ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography 
+            WHERE driver_id = ?
+        """.trimIndent()
+        
+        try {
+            conn.prepareStatement(spatialQuery).use { stmt ->
+                stmt.setDouble(1, lat)
+                stmt.setDouble(2, lng)
+                stmt.setFloat(3, bearing)
+                stmt.setDouble(4, lng)
+                stmt.setDouble(5, lat)
+                stmt.setInt(6, driverId.toInt())
+                stmt.executeUpdate()
+            }
+        } catch (e: Exception) {
+            val basicQuery = "UPDATE driver_stats SET latitude = ?, longitude = ?, bearing = ? WHERE driver_id = ?"
+            conn.prepareStatement(basicQuery).use { stmt ->
+                stmt.setDouble(1, lat)
+                stmt.setDouble(2, lng)
+                stmt.setFloat(3, bearing)
+                stmt.setInt(4, driverId.toInt())
+                stmt.executeUpdate()
+            }
+        }
     }
 }
 

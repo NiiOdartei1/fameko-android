@@ -219,25 +219,31 @@ class DriverRepository {
      */
     suspend fun getDriverStats(driverId: String): Result<DriverStats> = withContext(Dispatchers.IO) {
         try {
-            ensureDriverLoaded()
-            DriverManager.getConnection(
-                DatabaseConfig.getJdbcUrl(),
-                DatabaseConfig.DB_USER,
-                DatabaseConfig.DB_PASS,
-            ).use { connection ->
-                val query = "SELECT * FROM driver_stats WHERE driver_id = ?"
-                connection.prepareStatement(query).use { stmt ->
-                    stmt.setString(1, driverId)
-                    val rs = stmt.executeQuery()
-                    if (rs.next()) {
-                        Result.success(rs.toDriverStats())
-                    } else {
-                        Result.failure(Exception("Stats not found"))
+            val stats = NetworkClient.famekoApi.getDriverStats(driverId)
+            Result.success(stats)
+        } catch (e: Exception) {
+            Log.e("FamekoRepo", "API getDriverStats failed, falling back to JDBC", e)
+            try {
+                ensureDriverLoaded()
+                DriverManager.getConnection(
+                    DatabaseConfig.getJdbcUrl(),
+                    DatabaseConfig.DB_USER,
+                    DatabaseConfig.DB_PASS,
+                ).use { connection ->
+                    val query = "SELECT * FROM driver_stats WHERE driver_id = ?"
+                    connection.prepareStatement(query).use { stmt ->
+                        stmt.setString(1, driverId)
+                        val rs = stmt.executeQuery()
+                        if (rs.next()) {
+                            Result.success(rs.toDriverStats())
+                        } else {
+                            Result.failure(Exception("Stats not found"))
+                        }
                     }
                 }
+            } catch (e2: Exception) {
+                Result.failure(Exception("Failed to fetch driver stats: ${e2.localizedMessage}"))
             }
-        } catch (_: Exception) {
-            Result.failure(Exception("Failed to fetch driver stats"))
         }
     }
 
@@ -246,22 +252,32 @@ class DriverRepository {
      */
     suspend fun updateOnlineStatus(driverId: String, isOnline: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            ensureDriverLoaded()
-            DriverManager.getConnection(
-                DatabaseConfig.getJdbcUrl(),
-                DatabaseConfig.DB_USER,
-                DatabaseConfig.DB_PASS,
-            ).use { connection ->
-                val query = "UPDATE driver_stats SET is_online = ? WHERE driver_id = ?"
-                connection.prepareStatement(query).use { stmt ->
-                    stmt.setBoolean(1, isOnline)
-                    stmt.setString(2, driverId)
-                    stmt.executeUpdate()
-                    Result.success(Unit)
-                }
+            val response = NetworkClient.famekoApi.updateOnlineStatus(driverId, isOnline)
+            if (response.success) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.message ?: "Failed to update status via API"))
             }
-        } catch (_: Exception) {
-            Result.failure(Exception("Failed to update status"))
+        } catch (e: Exception) {
+            Log.e("FamekoRepo", "API status update failed, falling back to JDBC", e)
+            try {
+                ensureDriverLoaded()
+                DriverManager.getConnection(
+                    DatabaseConfig.getJdbcUrl(),
+                    DatabaseConfig.DB_USER,
+                    DatabaseConfig.DB_PASS,
+                ).use { connection ->
+                    val query = "UPDATE driver_stats SET is_online = ? WHERE driver_id = ?"
+                    connection.prepareStatement(query).use { stmt ->
+                        stmt.setBoolean(1, isOnline)
+                        stmt.setString(2, driverId)
+                        stmt.executeUpdate()
+                        Result.success(Unit)
+                    }
+                }
+            } catch (e2: Exception) {
+                Result.failure(e2)
+            }
         }
     }
 
@@ -469,45 +485,55 @@ class DriverRepository {
 
     suspend fun updateLocation(driverId: String, lat: Double, lng: Double, bearing: Float): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            ensureDriverLoaded()
-            DriverManager.getConnection(
-                DatabaseConfig.getJdbcUrl(),
-                DatabaseConfig.DB_USER,
-                DatabaseConfig.DB_PASS,
-            ).use { connection ->
-                // Try updating with PostGIS point first
-                val spatialQuery = """
-                    UPDATE driver_stats 
-                    SET latitude = ?, longitude = ?, bearing = ?, 
-                        location = ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography 
-                    WHERE driver_id = ?
-                """.trimIndent()
-                
-                try {
-                    connection.prepareStatement(spatialQuery).use { stmt ->
-                        stmt.setDouble(1, lat)
-                        stmt.setDouble(2, lng)
-                        stmt.setFloat(3, bearing)
-                        stmt.setDouble(4, lng)
-                        stmt.setDouble(5, lat)
-                        stmt.setString(6, driverId)
-                        stmt.executeUpdate()
-                    }
-                } catch (_: Exception) {
-                    // Fallback to simple latitude/longitude update if PostGIS extension is missing
-                    val basicQuery = "UPDATE driver_stats SET latitude = ?, longitude = ?, bearing = ? WHERE driver_id = ?"
-                    connection.prepareStatement(basicQuery).use { stmt ->
-                        stmt.setDouble(1, lat)
-                        stmt.setDouble(2, lng)
-                        stmt.setFloat(3, bearing)
-                        stmt.setString(4, driverId)
-                        stmt.executeUpdate()
-                    }
-                }
+            val response = NetworkClient.famekoApi.updateLocation(driverId, lat, lng, bearing)
+            if (response.success) {
                 Result.success(Unit)
+            } else {
+                Result.failure(Exception(response.message ?: "Failed to update location via API"))
             }
-        } catch (_: Exception) {
-            Result.failure(Exception("Failed to update location"))
+        } catch (e: Exception) {
+            Log.e("FamekoRepo", "API Location update failed, falling back to JDBC", e)
+            try {
+                ensureDriverLoaded()
+                DriverManager.getConnection(
+                    DatabaseConfig.getJdbcUrl(),
+                    DatabaseConfig.DB_USER,
+                    DatabaseConfig.DB_PASS,
+                ).use { connection ->
+                    // Try updating with PostGIS point first
+                    val spatialQuery = """
+                        UPDATE driver_stats 
+                        SET latitude = ?, longitude = ?, bearing = ?, 
+                            location = ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography 
+                        WHERE driver_id = ?
+                    """.trimIndent()
+                    
+                    try {
+                        connection.prepareStatement(spatialQuery).use { stmt ->
+                            stmt.setDouble(1, lat)
+                            stmt.setDouble(2, lng)
+                            stmt.setFloat(3, bearing)
+                            stmt.setDouble(4, lng)
+                            stmt.setDouble(5, lat)
+                            stmt.setString(6, driverId)
+                            stmt.executeUpdate()
+                        }
+                    } catch (_: Exception) {
+                        // Fallback to simple latitude/longitude update if PostGIS extension is missing
+                        val basicQuery = "UPDATE driver_stats SET latitude = ?, longitude = ?, bearing = ? WHERE driver_id = ?"
+                        connection.prepareStatement(basicQuery).use { stmt ->
+                            stmt.setDouble(1, lat)
+                            stmt.setDouble(2, lng)
+                            stmt.setFloat(3, bearing)
+                            stmt.setString(4, driverId)
+                            stmt.executeUpdate()
+                        }
+                    }
+                    Result.success(Unit)
+                }
+            } catch (_: Exception) {
+                Result.failure(Exception("Failed to update location"))
+            }
         }
     }
 

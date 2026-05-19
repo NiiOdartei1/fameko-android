@@ -68,6 +68,27 @@ interface FamekoApiService {
         @Path("id") driverId: String
     ): DriverStatusResponse
 
+    @GET("driver/stats/{id}")
+    suspend fun getDriverStats(
+        @Path("id") driverId: String
+    ): DriverStats
+
+    @FormUrlEncoded
+    @POST("driver/update-online-status")
+    suspend fun updateOnlineStatus(
+        @Field("driver_id") driverId: String,
+        @Field("is_online") isOnline: Boolean
+    ): AuthResponse
+
+    @FormUrlEncoded
+    @POST("driver/update-location")
+    suspend fun updateLocation(
+        @Field("driver_id") driverId: String,
+        @Field("latitude") lat: Double,
+        @Field("longitude") lng: Double,
+        @Field("bearing") bearing: Float
+    ): AuthResponse
+
     @POST("chat/send")
     suspend fun sendMessage(
         @Body message: Message

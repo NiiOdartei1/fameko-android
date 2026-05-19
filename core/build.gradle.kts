@@ -31,7 +31,7 @@ dependencies {
     
     api(libs.androidx.core.ktx)
     api(libs.androidx.appcompat)
-    api("org.postgresql:postgresql:42.2.27")
+    api("org.postgresql:postgresql:42.2.5") // Downgraded for Android compatibility (ManagementFactory issue)
     api(libs.kotlinx.coroutines.android)
     
     // Networking

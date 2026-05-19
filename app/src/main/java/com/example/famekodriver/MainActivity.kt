@@ -12,7 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.lifecycleScope
 import com.example.famekodriver.core.data.SessionManager
 import com.example.famekodriver.core.data.repository.DriverRepository
@@ -22,6 +24,7 @@ import kotlinx.coroutines.launch
 sealed class Screen {
     object Map : Screen()
     object Wallet : Screen()
+    object Settings : Screen()
     data class Chat(val conversationId: Int, val customerName: String) : Screen()
 }
 
@@ -39,6 +42,23 @@ class MainActivity : ComponentActivity() {
             var currentStatus by remember { mutableStateOf(sessionManager.getDriverStatus()) }
             var currentScreen by remember { mutableStateOf<Screen>(Screen.Map) }
             
+            val context = LocalContext.current
+            var lastBackPressTime by remember { mutableLongStateOf(0L) }
+
+            BackHandler {
+                if (currentScreen != Screen.Map) {
+                    currentScreen = Screen.Map
+                } else {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBackPressTime < 2000) {
+                        finish()
+                    } else {
+                        lastBackPressTime = currentTime
+                        Toast.makeText(context, "Double tap back to exit", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
             LaunchedEffect(Unit) {
                 while(true) {
                     delay(5000)
@@ -50,9 +70,23 @@ class MainActivity : ComponentActivity() {
                 when (val screen = currentScreen) {
                     is Screen.Map -> {
                         MapScreen(
+                            onNavigateToSettings = {
+                                currentScreen = Screen.Settings
+                            },
+                            onNavigateToChat = { convId, name ->
+                                currentScreen = Screen.Chat(convId, name)
+                            }
+                        )
+                    }
+                    is Screen.Settings -> {
+                        SettingsScreen(
+                            onBack = { currentScreen = Screen.Map },
                             onNavigateToProfile = {
                                 val intent = Intent(this@MainActivity, DriverProfileActivity::class.java)
                                 startActivity(intent)
+                            },
+                            onNavigateToWallet = {
+                                currentScreen = Screen.Wallet
                             },
                             onLogout = {
                                 sessionManager.logout()
@@ -60,12 +94,6 @@ class MainActivity : ComponentActivity() {
                                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                                 startActivity(intent)
                                 finish()
-                            },
-                            onNavigateToWallet = {
-                                currentScreen = Screen.Wallet
-                            },
-                            onNavigateToChat = { convId, name ->
-                                currentScreen = Screen.Chat(convId, name)
                             }
                         )
                     }

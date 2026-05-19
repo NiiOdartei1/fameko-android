@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -71,10 +72,8 @@ import com.example.famekodriver.core.domain.model.RouteRequest
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
-    onNavigateToProfile: () -> Unit,
-    onNavigateToWallet: () -> Unit,
-    onNavigateToChat: (Int, String) -> Unit,
-    onLogout: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToChat: (Int, String) -> Unit
 ) {
     val context = LocalContext.current
     val repository = remember { DriverRepository() }
@@ -287,16 +286,10 @@ fun MapScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Delivery Map") },
+                title = { Text("Fameko Driver") },
                 actions = {
-                    IconButton(onClick = onNavigateToWallet) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = "Wallet")
-                    }
-                    IconButton(onClick = onNavigateToProfile) {
-                        Icon(Icons.Default.Person, contentDescription = "Profile")
-                    }
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
@@ -402,7 +395,7 @@ fun MapScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (driverStatus != "APPROVED") {
-                    RegistrationNotice(status = driverStatus, onGoToProfile = onNavigateToProfile)
+                    RegistrationNotice(status = driverStatus, onGoToProfile = onNavigateToSettings)
                 }
 
                 currentSurge?.let { surge ->
@@ -429,27 +422,7 @@ fun MapScreen(
                     }
                 }
 
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f)),
-                    elevation = CardDefaults.cardElevation(4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("TODAY'S EARNINGS", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                            Text("₵${String.format(Locale.getDefault(), "%.2f", driverStats.earningsToday)}", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF28A745))
-                        }
-                        VerticalDivider(modifier = Modifier.height(30.dp).padding(horizontal = 16.dp), color = Color.LightGray)
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("RATING", fontSize = 10.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                            Text("${String.format(Locale.getDefault(), "%.1f", driverStats.rating)} ⭐", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFFFB400))
-                        }
-                    }
-                }
+                /* Removing Earnings Card from Map */
 
                 // In-App Navigation HUD
                 if (navigationPath.isNotEmpty() && currentDelivery != null) {
@@ -607,6 +580,12 @@ fun MapScreen(
                                         else -> delivery.status
                                     }
                                     repository.updateDeliveryStatus(delivery.id, nextStatus).onSuccess {
+                                        if (nextStatus == DeliveryStatus.DELIVERED) {
+                                            currentDelivery = null
+                                            navigationPath = emptyList()
+                                        } else {
+                                            currentDelivery = delivery.copy(status = nextStatus)
+                                        }
                                         Toast.makeText(context, "Status Updated!", Toast.LENGTH_SHORT).show()
                                     }
                                 }
@@ -665,6 +644,12 @@ fun MapScreen(
                                             val driverId = sessionManager.getDriverId() ?: "DRIVER-1"
                                             repository.acceptDelivery(driverId, delivery.id).onSuccess {
                                                 isAccepting = false
+                                                activeRequest = null
+                                                // Immediately update currentDelivery to transition UI
+                                                currentDelivery = delivery.copy(
+                                                    driverId = driverId,
+                                                    status = DeliveryStatus.ASSIGNED
+                                                )
                                                 Toast.makeText(context, "Request Accepted!", Toast.LENGTH_SHORT).show()
                                             }.onFailure { error ->
                                                 isAccepting = false
@@ -690,28 +675,7 @@ fun MapScreen(
                 }
             }
 
-            if (currentDelivery == null) {
-                Button(
-                    onClick = { isOnline = !isOnline },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = if (activeRequest != null) 420.dp else 32.dp)
-                        .height(64.dp)
-                        .fillMaxWidth(0.6f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isOnline) Color(0xFFDC3545) else Color(0xFF28A745)
-                    ),
-                    shape = RoundedCornerShape(32.dp),
-                    elevation = ButtonDefaults.buttonElevation(8.dp)
-                ) {
-                    Text(
-                        if (isOnline) "GO OFFLINE" else "GO ONLINE",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 18.sp,
-                        letterSpacing = 1.sp
-                    )
-                }
-            }
+            /* Removing GO ONLINE button from Map */
 
             incomingCall?.let { call ->
                 AlertDialog(

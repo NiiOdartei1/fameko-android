@@ -461,26 +461,84 @@ class DriverRepository {
         try {
             ensureDriverLoaded()
             DriverManager.getConnection(DatabaseConfig.getJdbcUrl(), DatabaseConfig.DB_USER, DatabaseConfig.DB_PASS).use { conn ->
-                val stmt = conn.prepareStatement("UPDATE deliveries SET driver_id = ?, status = 'ASSIGNED' WHERE id = ?")
-                stmt.setString(1, driverId)
-                stmt.setString(2, deliveryId)
-                stmt.executeUpdate()
-                Result.success(Unit)
+                conn.autoCommit = false
+                try {
+                    // 1. Get the order_id associated with this delivery
+                    val getOrderStmt = conn.prepareStatement("SELECT order_id FROM deliveries WHERE id = ?")
+                    getOrderStmt.setString(1, deliveryId)
+                    val rs = getOrderStmt.executeQuery()
+                    val orderId = if (rs.next()) rs.getInt("order_id") else -1
+
+                    // 2. Update delivery status and assign driver
+                    val stmt = conn.prepareStatement("UPDATE deliveries SET driver_id = ?, status = 'ASSIGNED' WHERE id = ?")
+                    stmt.setString(1, driverId)
+                    stmt.setString(2, deliveryId)
+                    stmt.executeUpdate()
+
+                    // 3. Update order status to match
+                    if (orderId != -1) {
+                        val orderStmt = conn.prepareStatement("UPDATE orders SET status = 'Assigned' WHERE id = ?")
+                        orderStmt.setInt(1, orderId)
+                        orderStmt.executeUpdate()
+                    }
+
+                    conn.commit()
+                    Result.success(Unit)
+                } catch (e: Exception) {
+                    conn.rollback()
+                    throw e
+                }
             }
-        } catch (_: Exception) { Result.failure(Exception("Failed to accept delivery")) }
+        } catch (e: Exception) { 
+            Log.e("FamekoRepo", "Failed to accept delivery", e)
+            Result.failure(Exception("Failed to accept delivery: ${e.message}")) 
+        }
     }
 
     suspend fun updateDeliveryStatus(deliveryId: String, status: DeliveryStatus): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             ensureDriverLoaded()
             DriverManager.getConnection(DatabaseConfig.getJdbcUrl(), DatabaseConfig.DB_USER, DatabaseConfig.DB_PASS).use { conn ->
-                val stmt = conn.prepareStatement("UPDATE deliveries SET status = ? WHERE id = ?")
-                stmt.setString(1, status.name)
-                stmt.setString(2, deliveryId)
-                stmt.executeUpdate()
-                Result.success(Unit)
+                conn.autoCommit = false
+                try {
+                    // 1. Get the order_id associated with this delivery
+                    val getOrderStmt = conn.prepareStatement("SELECT order_id FROM deliveries WHERE id = ?")
+                    getOrderStmt.setString(1, deliveryId)
+                    val rs = getOrderStmt.executeQuery()
+                    val orderId = if (rs.next()) rs.getInt("order_id") else -1
+
+                    // 2. Update delivery status
+                    val stmt = conn.prepareStatement("UPDATE deliveries SET status = ? WHERE id = ?")
+                    stmt.setString(1, status.name)
+                    stmt.setString(2, deliveryId)
+                    stmt.executeUpdate()
+
+                    // 3. Update order status to match
+                    if (orderId != -1) {
+                        val orderStatus = when(status) {
+                            DeliveryStatus.ASSIGNED -> "Assigned"
+                            DeliveryStatus.IN_TRANSIT -> "In Transit"
+                            DeliveryStatus.DELIVERED -> "Delivered"
+                            DeliveryStatus.CANCELLED -> "Cancelled"
+                            else -> "Processing"
+                        }
+                        val orderStmt = conn.prepareStatement("UPDATE orders SET status = ? WHERE id = ?")
+                        orderStmt.setString(1, orderStatus)
+                        orderStmt.setInt(2, orderId)
+                        orderStmt.executeUpdate()
+                    }
+
+                    conn.commit()
+                    Result.success(Unit)
+                } catch (e: Exception) {
+                    conn.rollback()
+                    throw e
+                }
             }
-        } catch (_: Exception) { Result.failure(Exception("Failed to update delivery status")) }
+        } catch (e: Exception) { 
+            Log.e("FamekoRepo", "Failed to update delivery status", e)
+            Result.failure(Exception("Failed to update delivery status: ${e.message}")) 
+        }
     }
 
     suspend fun updateLocation(driverId: String, lat: Double, lng: Double, bearing: Float): Result<Unit> = withContext(Dispatchers.IO) {

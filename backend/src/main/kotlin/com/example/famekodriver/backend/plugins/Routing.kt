@@ -36,7 +36,7 @@ fun Application.configureRouting() {
             get("/dashboard") {
                 val drivers = getAllDrivers()
                 val deliveries = getAllDeliveries()
-                val pendingCount = drivers.count { it["status"] == "PENDING" }
+                val pendingCount = drivers.count { it["status"] == "PENDING" || it["status"] == "PENDING_DOCS" }
                 val onlineCount = getOnlineDriverLocations().size
                 call.respond(ThymeleafContent("admin_dashboard", mapOf(
                     "drivers" to drivers,
@@ -108,7 +108,7 @@ fun Application.configureRouting() {
                 if (id != null) {
                     updateDriverStatus(id, "APPROVED")
                 }
-                call.respondRedirect("/admin/dashboard")
+                call.respondRedirect("/admin/driver/$id")
             }
             
             post("/reject/{id}") {
@@ -116,7 +116,7 @@ fun Application.configureRouting() {
                 if (id != null) {
                     updateDriverStatus(id, "REJECTED")
                 }
-                call.respondRedirect("/admin/dashboard")
+                call.respondRedirect("/admin/driver/$id")
             }
 
             post("/suspend/{id}") {
@@ -1021,12 +1021,14 @@ private fun registerDriverInDb(data: Map<String, String>): Int? {
             stmt.setString(9, data["service_type"] ?: "both")
             stmt.setString(10, data["profile_pic"] ?: "")
             stmt.setString(11, data["drivers_license"] ?: "")
-            stmt.setString(12, data["ghana_card"] ?: "") // id_front_image
-            stmt.setString(13, "") // id_back_image placeholder
-            stmt.setString(14, "") // vehicle_image placeholder
+            stmt.setString(12, data["insurance_cert"] ?: "")
+            stmt.setString(13, data["roadworthy_cert"] ?: "")
+            stmt.setString(14, data["ghana_card"] ?: "")
             
             // If all docs are missing, mark as PENDING_DOCS
-            val hasDocs = data.containsKey("profile_pic") || data.containsKey("drivers_license")
+            val hasDocs = data.containsKey("profile_pic") || data.containsKey("drivers_license") || 
+                         data.containsKey("insurance_cert") || data.containsKey("roadworthy_cert") || 
+                         data.containsKey("ghana_card")
             stmt.setString(15, if (hasDocs) "PENDING" else "PENDING_DOCS")
             
             val rs = stmt.executeQuery()

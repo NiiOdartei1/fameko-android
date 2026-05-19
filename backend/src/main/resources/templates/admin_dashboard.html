@@ -246,9 +246,10 @@
             display: inline-block;
         }
 
-        .status-PENDING { background: #fff9db; color: #f08c00; }
+        .status-PENDING, .status-PENDING_DOCS { background: #fff9db; color: #f08c00; }
         .status-APPROVED { background: #ebfbee; color: #2b8a3e; }
         .status-REJECTED { background: #fff5f5; color: #c92a2a; }
+        .status-SUSPENDED { background: #fff4e6; color: #d9480f; }
         .status-IN_TRANSIT { background: #e7f5ff; color: #1971c2; }
 
         .btn-group { display: flex; gap: 8px; }
@@ -411,7 +412,7 @@
                                 <span data-th-class="${'status-badge status-' + driver['status']}" data-th-text="${driver['status']}">PENDING</span>
                             </td>
                             <td>
-                                <div data-th-if="${driver['status'] == 'PENDING'}" class="btn-group">
+                                <div data-th-if="${driver['status'] == 'PENDING' || driver['status'] == 'PENDING_DOCS'}" class="btn-group">
                                     <form data-th-action="'/admin/approve/' + ${driver['id']}" method="post">
                                         <button type="submit" class="btn btn-approve">
                                             <i class="fas fa-check"></i> Approve
@@ -423,7 +424,7 @@
                                         </button>
                                     </form>
                                 </div>
-                                <div data-th-unless="${driver['status'] == 'PENDING'}">
+                                <div data-th-unless="${driver['status'] == 'PENDING' || driver['status'] == 'PENDING_DOCS'}">
                                     <a data-th-href="${'/admin/driver/' + driver['id']}" class="btn" style="background: #f8f9fa; color: var(--primary-color); text-decoration: none; display: inline-block;">
                                         <i class="fas fa-eye"></i> View Profile
                                     </a>

@@ -127,7 +127,7 @@
         }
 
         .status-badge { padding: 6px 14px; border-radius: 30px; font-size: 0.75rem; font-weight: 700; }
-        .status-PENDING { background: #fff9db; color: #f08c00; }
+        .status-PENDING, .status-PENDING_DOCS { background: #fff9db; color: #f08c00; }
         .status-APPROVED { background: #ebfbee; color: #2b8a3e; }
         .status-REJECTED { background: #fff5f5; color: #c92a2a; }
         .status-SUSPENDED { background: #fff4e6; color: #d9480f; }
@@ -303,7 +303,7 @@
 
                 <div style="margin-top: 40px; display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 30px;">
                     <!-- Pending Flow -->
-                    <div th:if="${driver['status'] == 'PENDING'}" style="display: flex; gap: 15px;">
+                    <div th:if="${driver['status'] == 'PENDING' || driver['status'] == 'PENDING_DOCS'}" style="display: flex; gap: 15px;">
                         <form th:action="${'/admin/approve/' + driver['id']}" method="post">
                             <button type="submit" class="btn btn-approve"><i class="fas fa-check"></i> Approve Driver Account</button>
                         </form>

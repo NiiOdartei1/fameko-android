@@ -13,23 +13,53 @@ object DatabaseInitializer {
         if (dataSource == null) {
             println("Initializing Render PostgreSQL connection...")
             try {
-                // Prioritize Environment Variables for Railway/Render Deployment
-                // Railway provides DATABASE_URL by default
-                val envJdbcUrl = System.getenv("DATABASE_URL") ?: System.getenv("DB_URL")
-                val envUser = System.getenv("DB_USER")
-                val envPass = System.getenv("DB_PASS")
-
-                var finalUrl = envJdbcUrl ?: DatabaseConfig.getJdbcUrl()
+                val envUrl = System.getenv("DATABASE_URL") ?: System.getenv("DB_URL")
                 
-                // Fix: Ensure the URL starts with "jdbc:" which is required by the JDBC driver
-                if (!finalUrl.startsWith("jdbc:")) {
-                    finalUrl = "jdbc:$finalUrl"
+                var finalUrl: String
+                var finalUser: String? = System.getenv("DB_USER")
+                var finalPass: String? = System.getenv("DB_PASS")
+
+                if (envUrl != null && (envUrl.startsWith("postgresql://") || envUrl.startsWith("postgres://"))) {
+                    // Parse Railway/Render/Heroku style URL: postgresql://user:pass@host:port/db
+                    try {
+                        val cleanUrl = envUrl.replace("postgresql://", "http://").replace("postgres://", "http://")
+                        val uri = java.net.URI(cleanUrl)
+                        val userInfo = uri.userInfo
+                        if (userInfo != null && userInfo.contains(":")) {
+                            val parts = userInfo.split(":")
+                            finalUser = parts[0]
+                            finalPass = parts[1]
+                        }
+                        
+                        // Reconstruct as a clean JDBC URL
+                        val host = uri.host
+                        val port = if (uri.port != -1) uri.port else 5432
+                        val path = uri.path
+                        finalUrl = "jdbc:postgresql://$host:$port$path"
+                        
+                        // Append queries if present (like sslmode)
+                        if (uri.query != null) {
+                            finalUrl += "?" + uri.query
+                        } else if (envUrl.contains("railway.internal")) {
+                            // Internal Railway connections don't usually need SSL
+                            finalUrl += "?sslmode=disable"
+                        }
+                    } catch (e: Exception) {
+                        println("Warning: Manual URL parsing failed, falling back: ${e.message}")
+                        finalUrl = if (envUrl.startsWith("jdbc:")) envUrl else "jdbc:$envUrl"
+                    }
+                } else {
+                    finalUrl = envUrl ?: DatabaseConfig.getJdbcUrl()
+                    if (!finalUrl.startsWith("jdbc:")) {
+                        finalUrl = "jdbc:$finalUrl"
+                    }
                 }
 
-                val finalUser = envUser ?: DatabaseConfig.DB_USER
-                val finalPass = envPass ?: DatabaseConfig.DB_PASS
+                finalUser = finalUser ?: DatabaseConfig.DB_USER
+                finalPass = finalPass ?: DatabaseConfig.DB_PASS
 
-                println("Using Connection URL: ${finalUrl.take(25)}...")
+                println("Connecting to: $finalUrl")
+                println("User: $finalUser")
 
                 Class.forName("org.postgresql.Driver")
                 val config = HikariConfig().apply {

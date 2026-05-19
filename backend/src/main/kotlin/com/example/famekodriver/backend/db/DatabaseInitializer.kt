@@ -74,20 +74,23 @@ object DatabaseInitializer {
                 }
                 dataSource = HikariDataSource(config)
                 
-                dataSource!!.connection.use { conn ->
-                    // Try to enable PostGIS but don't crash if it fails
-                    try {
+                // 1. Try to enable PostGIS in a separate block
+                try {
+                    dataSource!!.connection.use { conn ->
                         conn.createStatement().execute("CREATE EXTENSION IF NOT EXISTS postgis;")
                         println("PostGIS extension checked/enabled.")
-                    } catch (e: Exception) {
-                        println("Warning: Could not enable PostGIS extension: ${e.message}")
                     }
+                } catch (e: Exception) {
+                    println("Warning: PostGIS extension not available. Spatial features will be disabled: ${e.message}")
+                }
 
+                // 2. Setup tables using a FRESH connection (in case the previous one was marked broken by Hikari)
+                dataSource!!.connection.use { conn ->
                     println("Setting up database tables...")
                     createTables(conn)
-                    migrateTables(conn) // Add migration
+                    migrateTables(conn)
                     seedAdmin(conn)
-                    println("Render PostgreSQL setup complete.")
+                    println("Database setup complete.")
                 }
             } catch (e: Exception) {
                 println("Database initialization failed!")
@@ -161,42 +164,6 @@ object DatabaseInitializer {
         val statements = listOf(
             "CREATE EXTENSION IF NOT EXISTS postgis;",
             """
-            CREATE TABLE IF NOT EXISTS driver_stats (
-                driver_id INTEGER PRIMARY KEY REFERENCES drivers(id),
-                is_online BOOLEAN DEFAULT FALSE,
-                active_deliveries INTEGER DEFAULT 0,
-                completed_today INTEGER DEFAULT 0,
-                earnings_today NUMERIC(12, 2) DEFAULT 0.0,
-                rating DOUBLE PRECISION DEFAULT 5.0,
-                rating_count INTEGER DEFAULT 0,
-                total_deliveries INTEGER DEFAULT 0,
-                completion_rate INTEGER DEFAULT 100,
-                total_earnings NUMERIC(12, 2) DEFAULT 0.0,
-                latitude DOUBLE PRECISION,
-                longitude DOUBLE PRECISION,
-                location GEOGRAPHY(POINT, 4326),
-                bearing REAL DEFAULT 0.0,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """.trimIndent(),
-            "CREATE INDEX IF NOT EXISTS driver_stats_location_idx ON driver_stats USING GIST (location);",
-            """
-            CREATE TABLE IF NOT EXISTS customers (
-                id SERIAL PRIMARY KEY,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                phone TEXT NOT NULL,
-                region TEXT,
-                password TEXT NOT NULL,
-                default_address TEXT,
-                default_latitude DOUBLE PRECISION,
-                default_longitude DOUBLE PRECISION,
-                profile_picture TEXT,
-                is_active BOOLEAN DEFAULT TRUE,
-                date_joined TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """.trimIndent(),
-            """
             CREATE TABLE IF NOT EXISTS drivers (
                 id SERIAL PRIMARY KEY,
                 full_name TEXT NOT NULL,
@@ -229,6 +196,43 @@ object DatabaseInitializer {
                 rating DOUBLE PRECISION DEFAULT 5.0,
                 date_joined TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """.trimIndent(),
+            """
+            CREATE TABLE IF NOT EXISTS driver_stats (
+                driver_id INTEGER PRIMARY KEY REFERENCES drivers(id),
+                is_online BOOLEAN DEFAULT FALSE,
+                active_deliveries INTEGER DEFAULT 0,
+                completed_today INTEGER DEFAULT 0,
+                earnings_today NUMERIC(12, 2) DEFAULT 0.0,
+                rating DOUBLE PRECISION DEFAULT 5.0,
+                rating_count INTEGER DEFAULT 0,
+                total_deliveries INTEGER DEFAULT 0,
+                completion_rate INTEGER DEFAULT 100,
+                total_earnings NUMERIC(12, 2) DEFAULT 0.0,
+                latitude DOUBLE PRECISION,
+                longitude DOUBLE PRECISION,
+                bearing REAL DEFAULT 0.0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """.trimIndent(),
+            // Add spatial column separately so it doesn't crash the whole table creation if PostGIS is missing
+            "ALTER TABLE driver_stats ADD COLUMN IF NOT EXISTS location GEOGRAPHY(POINT, 4326);",
+            "CREATE INDEX IF NOT EXISTS driver_stats_location_idx ON driver_stats USING GIST (location);",
+            """
+            CREATE TABLE IF NOT EXISTS customers (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                phone TEXT NOT NULL,
+                region TEXT,
+                password TEXT NOT NULL,
+                default_address TEXT,
+                default_latitude DOUBLE PRECISION,
+                default_longitude DOUBLE PRECISION,
+                profile_picture TEXT,
+                is_active BOOLEAN DEFAULT TRUE,
+                date_joined TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """.trimIndent(),
             """
@@ -407,7 +411,11 @@ object DatabaseInitializer {
 
         conn.createStatement().use { stmt ->
             statements.forEach { sql ->
-                stmt.execute(sql)
+                try {
+                    stmt.execute(sql)
+                } catch (e: Exception) {
+                    println("Statement skipped: ${e.message}")
+                }
             }
         }
     }

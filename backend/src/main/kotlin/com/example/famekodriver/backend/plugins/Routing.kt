@@ -1160,8 +1160,11 @@ private fun getDriverById(id: String): Map<String, Any>? {
                 val value = rs.getObject(i)
                 if (value != null) map[name] = value
             }
-            // Friendly aliases for templates
-            map["name"] = rs.getString("full_name")
+            // Force clean string values for status and ID
+            map["status"] = rs.getString("status")?.uppercase()?.trim() ?: "PENDING"
+            map["id"] = rs.getInt("id")
+            map["full_name"] = rs.getString("full_name") ?: "Driver"
+            map["name"] = map["full_name"]!!
             map["vehicle"] = rs.getString("vehicle_type") ?: ""
             return map
         }

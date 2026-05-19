@@ -219,7 +219,9 @@
                     </div>
                     <div class="info-item">
                         <label>Status</label>
-                        <span th:class="${'status-badge status-' + driver['status']}" th:text="${driver['status']}">PENDING</span>
+                        <span th:with="s=${driver['status'] != null ? driver['status'].toString().toUpperCase() : 'UNKNOWN'}"
+                              th:class="${'status-badge status-' + s}"
+                              th:text="${s}">PENDING</span>
                     </div>
                     <div class="info-item">
                         <label>Email Address</label>
@@ -301,9 +303,10 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 40px; display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 30px;">
+                <div th:with="s=${driver['status'] != null ? driver['status'].toString().toUpperCase() : 'UNKNOWN'}"
+                     style="margin-top: 40px; display: flex; gap: 15px; border-top: 1px solid #eee; padding-top: 30px;">
                     <!-- Pending Flow -->
-                    <div th:if="${driver['status'] == 'PENDING' || driver['status'] == 'PENDING_DOCS'}" style="display: flex; gap: 15px;">
+                    <div th:if="${s == 'PENDING' || s == 'PENDING_DOCS'}" style="display: flex; gap: 15px;">
                         <form th:action="${'/admin/approve/' + driver['id']}" method="post">
                             <button type="submit" class="btn btn-approve"><i class="fas fa-check"></i> Approve Driver Account</button>
                         </form>
@@ -313,21 +316,21 @@
                     </div>
 
                     <!-- Approved Flow -->
-                    <div th:if="${driver['status'] == 'APPROVED'}" style="display: flex; gap: 15px;">
+                    <div th:if="${s == 'APPROVED'}" style="display: flex; gap: 15px;">
                         <form th:action="${'/admin/suspend/' + driver['id']}" method="post">
                             <button type="submit" class="btn btn-suspend"><i class="fas fa-pause"></i> Suspend Driver</button>
                         </form>
                     </div>
 
                     <!-- Suspended Flow -->
-                    <div th:if="${driver['status'] == 'SUSPENDED'}" style="display: flex; gap: 15px;">
+                    <div th:if="${s == 'SUSPENDED'}" style="display: flex; gap: 15px;">
                         <form th:action="${'/admin/release/' + driver['id']}" method="post">
                             <button type="submit" class="btn btn-approve"><i class="fas fa-play"></i> Release/Re-activate Driver</button>
                         </form>
                     </div>
 
                     <!-- Rejected Flow -->
-                    <div th:if="${driver['status'] == 'REJECTED'}" style="display: flex; gap: 15px;">
+                    <div th:if="${s == 'REJECTED'}" style="display: flex; gap: 15px;">
                         <form th:action="${'/admin/approve/' + driver['id']}" method="post">
                             <button type="submit" class="btn btn-approve"><i class="fas fa-rotate-left"></i> Re-consider and Approve</button>
                         </form>

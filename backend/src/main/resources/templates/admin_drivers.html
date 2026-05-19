@@ -160,12 +160,15 @@
                         </td>
                         <td th:text="${driver['vehicle']}">Car</td>
                         <td>
-                            <span th:class="${'status-badge status-' + driver['status']}" th:text="${driver['status']}">PENDING</span>
+                            <span th:with="s=${driver['status'] != null ? driver['status'].toString().toUpperCase() : 'UNKNOWN'}"
+                                  th:class="${'status-badge status-' + s}"
+                                  th:text="${s}">PENDING</span>
                         </td>
                         <td>
-                            <div style="display:flex; gap:8px">
+                            <div th:with="s=${driver['status'] != null ? driver['status'].toString().toUpperCase() : 'UNKNOWN'}"
+                                 style="display:flex; gap:8px">
                                 <!-- Pending -->
-                                <th:block th:if="${driver['status'] == 'PENDING' || driver['status'] == 'PENDING_DOCS'}">
+                                <th:block th:if="${s == 'PENDING' || s == 'PENDING_DOCS'}">
                                     <form th:action="${'/admin/approve/' + driver['id']}" method="post">
                                         <button type="submit" class="btn btn-approve">Approve</button>
                                     </form>
@@ -175,14 +178,14 @@
                                 </th:block>
 
                                 <!-- Approved -->
-                                <th:block th:if="${driver['status'] == 'APPROVED'}">
+                                <th:block th:if="${s == 'APPROVED'}">
                                     <form th:action="${'/admin/suspend/' + driver['id']}" method="post">
                                         <button type="submit" class="btn btn-reject" style="background: #fff5f5;">Suspend</button>
                                     </form>
                                 </th:block>
 
                                 <!-- Suspended -->
-                                <th:block th:if="${driver['status'] == 'SUSPENDED'}">
+                                <th:block th:if="${s == 'SUSPENDED'}">
                                     <form th:action="${'/admin/release/' + driver['id']}" method="post">
                                         <button type="submit" class="btn btn-approve">Release</button>
                                     </form>

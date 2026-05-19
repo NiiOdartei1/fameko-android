@@ -65,6 +65,7 @@ fun Application.configureRouting() {
                 val id = call.parameters["id"]
                 val driver = if (id != null) getDriverById(id) else null
                 if (driver != null) {
+                    println("DEBUG: Rendering driver details for ID $id. Status: ${driver["status"]}")
                     call.respond(ThymeleafContent("admin_driver_details", mapOf(
                         "driver" to driver,
                         "activePage" to "drivers"

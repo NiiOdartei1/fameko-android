@@ -71,7 +71,8 @@ object NetworkClient {
     }
 
     fun getWebSocketUrl(userId: String): String {
-        return BASE_URL.replace("http", "ws") + "ws/$userId"
+        val base = BASE_URL.removeSuffix("/")
+        return base.replace("http", "ws") + "/ws/$userId"
     }
 
     // Keep for backward compatibility until all calls are migrated

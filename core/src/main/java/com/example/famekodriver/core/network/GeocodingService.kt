@@ -147,4 +147,11 @@ interface FamekoApiService {
         @Query("lng") lng: Double,
         @Query("radius") radius: Double = 5.0
     ): List<DriverLocation>
+
+    @FormUrlEncoded
+    @POST("driver/accept-delivery")
+    suspend fun acceptDelivery(
+        @Field("driver_id") driverId: String,
+        @Field("delivery_id") deliveryId: String
+    ): AuthResponse
 }

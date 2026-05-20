@@ -230,6 +230,27 @@ fun Application.configureRouting() {
             call.respond(drivers)
         }
 
+        post("/driver/accept-delivery") {
+            try {
+                val params = call.receiveParameters()
+                val driverId = params["driver_id"]
+                val deliveryId = params["delivery_id"]
+                
+                if (driverId != null && deliveryId != null) {
+                    val success = acceptDeliveryInDb(driverId, deliveryId)
+                    if (success) {
+                        call.respond(AuthResponse(true, "Delivery accepted successfully", driverId, null))
+                    } else {
+                        call.respond(AuthResponse(false, "Failed to accept delivery", null, null))
+                    }
+                } else {
+                    call.respond(AuthResponse(false, "Missing driver_id or delivery_id", null, null))
+                }
+            } catch (e: Exception) {
+                call.respond(AuthResponse(false, e.message ?: "Accept failed", null, null))
+            }
+        }
+
         get("/orders/status/{orderId}") {
             val orderId = call.parameters["orderId"]?.toIntOrNull()
             if (orderId == null) {
@@ -847,6 +868,39 @@ private fun getDetailedOrderStatus(orderId: Int): Map<String, Any> {
         }
     }
     return mapOf("success" to false, "status" to "NOT_FOUND")
+}
+
+private fun acceptDeliveryInDb(driverId: String, deliveryId: String): Boolean {
+    DatabaseInitializer.getDataSource().connection.use { conn ->
+        conn.autoCommit = false
+        try {
+            // 1. Get the order_id associated with this delivery
+            val getOrderStmt = conn.prepareStatement("SELECT order_id FROM deliveries WHERE id = ?")
+            getOrderStmt.setInt(1, deliveryId.toInt())
+            val rs = getOrderStmt.executeQuery()
+            val orderId = if (rs.next()) rs.getInt("order_id") else -1
+
+            // 2. Update delivery status and assign driver
+            val stmt = conn.prepareStatement("UPDATE deliveries SET driver_id = ?, status = 'ASSIGNED' WHERE id = ?")
+            stmt.setInt(1, driverId.toInt())
+            stmt.setInt(2, deliveryId.toInt())
+            stmt.executeUpdate()
+
+            // 3. Update order status to match
+            if (orderId != -1) {
+                val orderStmt = conn.prepareStatement("UPDATE orders SET status = 'Assigned' WHERE id = ?")
+                orderStmt.setInt(1, orderId)
+                orderStmt.executeUpdate()
+            }
+
+            conn.commit()
+            return true
+        } catch (e: Exception) {
+            conn.rollback()
+            println("Error in acceptDeliveryInDb: ${e.message}")
+            return false
+        }
+    }
 }
 
 private fun getNearbyDriverLocations(lat: Double, lng: Double, radiusKm: Double): List<DriverLocation> {

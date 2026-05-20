@@ -852,24 +852,56 @@ private fun getDetailedOrderStatus(orderId: Int): Map<String, Any> {
 private fun getNearbyDriverLocations(lat: Double, lng: Double, radiusKm: Double): List<DriverLocation> {
     val drivers = mutableListOf<DriverLocation>()
     DatabaseInitializer.getDataSource().connection.use { conn ->
-        val sql = """
-            SELECT driver_id, latitude, longitude, bearing 
-            FROM driver_stats 
-            WHERE is_online = true 
-            AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
-        """.trimIndent()
-        val stmt = conn.prepareStatement(sql)
-        stmt.setDouble(1, lng) // Longitude first for ST_MakePoint
-        stmt.setDouble(2, lat)
-        stmt.setDouble(3, radiusKm * 1000)
-        val rs = stmt.executeQuery()
-        while (rs.next()) {
-            drivers.add(DriverLocation(
-                id = rs.getInt("driver_id").toString(),
-                latitude = rs.getDouble("latitude"),
-                longitude = rs.getDouble("longitude"),
-                bearing = rs.getFloat("bearing")
-            ))
+        try {
+            // Try PostGIS spatial query first
+            val sql = """
+                SELECT driver_id, latitude, longitude, bearing 
+                FROM driver_stats 
+                WHERE is_online = true 
+                AND ST_DWithin(location, ST_SetSRID(ST_MakePoint(?, ?), 4326)::geography, ?)
+            """.trimIndent()
+            val stmt = conn.prepareStatement(sql)
+            stmt.setDouble(1, lng) // Longitude first for ST_MakePoint
+            stmt.setDouble(2, lat)
+            stmt.setDouble(3, radiusKm * 1000)
+            val rs = stmt.executeQuery()
+            while (rs.next()) {
+                drivers.add(DriverLocation(
+                    id = rs.getInt("driver_id").toString(),
+                    latitude = rs.getDouble("latitude"),
+                    longitude = rs.getDouble("longitude"),
+                    bearing = rs.getFloat("bearing")
+                ))
+            }
+        } catch (e: Exception) {
+            println("Spatial query failed, falling back to math for nearby drivers: ${e.message}")
+            // Fallback to Haversine formula if PostGIS/location column is missing
+            val fallbackSql = """
+                SELECT driver_id, latitude, longitude, bearing,
+                (6371 * acos(least(1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) AS distance
+                FROM driver_stats
+                WHERE is_online = true 
+                AND latitude IS NOT NULL AND longitude IS NOT NULL
+                AND (6371 * acos(least(1.0, cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude))))) < ?
+                ORDER BY distance
+            """.trimIndent()
+            val stmt = conn.prepareStatement(fallbackSql)
+            stmt.setDouble(1, lat)
+            stmt.setDouble(2, lng)
+            stmt.setDouble(3, lat)
+            stmt.setDouble(4, lat)
+            stmt.setDouble(5, lng)
+            stmt.setDouble(6, lat)
+            stmt.setDouble(7, radiusKm)
+            val rs = stmt.executeQuery()
+            while (rs.next()) {
+                drivers.add(DriverLocation(
+                    id = rs.getInt("driver_id").toString(),
+                    latitude = rs.getDouble("latitude"),
+                    longitude = rs.getDouble("longitude"),
+                    bearing = rs.getFloat("bearing")
+                ))
+            }
         }
     }
     return drivers
